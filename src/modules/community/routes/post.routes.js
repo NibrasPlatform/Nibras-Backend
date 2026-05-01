@@ -12,8 +12,7 @@ const status = require("../../../core/constants/httpStatus");
 router.post(
     "/:threadId",
     authMiddleware.authenticate,
-    createPostValidator,
-    validate,
+    validate(createPostValidator),
     postController.createPost
 );
 
@@ -27,8 +26,7 @@ router.get("/:id", authMiddleware.authenticate, postController.getPostById);
 router.patch(
     "/:id",
     authMiddleware.authenticate,
-    updatePostValidator,
-    validate,
+    validate(updatePostValidator),
     postController.updatePost
 );
 

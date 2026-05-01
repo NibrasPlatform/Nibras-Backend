@@ -8,36 +8,31 @@ router.use(authMiddleware.authenticate);
 
 router.post(
   "/link",
-  accountValidator.linkAccountsValidator,
-  valid,
+  valid(accountValidator.linkAccountsValidator),
   accountController.linkAccounts,
 );
 
 router.post(
   "/verify/start",
-  accountValidator.startVerificationValidator,
-  valid,
+  valid(accountValidator.startVerificationValidator),
   accountController.startVerification,
 );
 
 router.post(
   "/verify/check",
-  accountValidator.checkVerificationValidator,
-  valid,
+  valid(accountValidator.checkVerificationValidator),
   accountController.checkVerification,
 );
 
 router.get(
   "/profile/:userId",
-  accountValidator.getProfileValidator,
-  valid,
+  valid(accountValidator.getProfileValidator),
   accountController.getProfile,
 );
 
 router.post(
   "/profile/sync",
-  accountValidator.syncProfileValidator,
-  valid,
+  valid(accountValidator.syncProfileValidator),
   accountController.syncProfileNow,
 );
 

@@ -4,24 +4,20 @@ const Contest = require("../modules/contests/models/contest.model");
 const emailService = require("../modules/contests/services/email.service");
 const logger = require("../core/utils/logger");
 
-/**
- * Scheduled job to send contest reminder notifications
- * Runs every 5 minutes to check for contests starting soon
- */
 class ReminderNotificationJob {
   constructor() {
     this.task = null;
-    // Default: Every 5 minutes (*/5 * * * *)
     this.schedule = process.env.REMINDER_CHECK_CRON || "*/5 * * * *";
-    // How many minutes before contest start to send reminder (default: 15)
-    this.reminderMinutes =
-      parseInt(process.env.REMINDER_TIME_BEFORE) || 15;
+    this.reminderMinutes = parseInt(process.env.REMINDER_TIME_BEFORE) || 15;
+    this.isRunning = false;
   }
 
-  /**
-   * Start the reminder notification job
-   */
   start() {
+    if (!cron.validate(this.schedule)) {
+      logger.error(`Invalid cron schedule: ${this.schedule}`);
+      return;
+    }
+
     logger.info(
       `Starting reminder notification job with schedule: ${this.schedule}`
     );
@@ -30,19 +26,27 @@ class ReminderNotificationJob {
     );
 
     this.task = cron.schedule(this.schedule, async () => {
+      if (this.isRunning) {
+        logger.warn("Reminder job already running, skipping this execution");
+        return;
+      }
+
+      this.isRunning = true;
       try {
         await this.sendReminders();
       } catch (error) {
         logger.error(`Reminder notification job failed: ${error.message}`);
+      } finally {
+        this.isRunning = false;
       }
+    }, {
+      scheduled: true,
+      timezone: process.env.JOB_TIMEZONE || "Africa/Cairo"
     });
 
     logger.info("Reminder notification job started successfully");
   }
 
-  /**
-   * Stop the reminder notification job
-   */
   stop() {
     if (this.task) {
       this.task.stop();

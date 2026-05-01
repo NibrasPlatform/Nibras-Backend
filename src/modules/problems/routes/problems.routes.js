@@ -1,7 +1,7 @@
 const router = require("express").Router();
 const problemController = require("../controllers/problem.controller");
 const authMiddleware = require("../../../core/middlewares/auth.middleware");
-const roleMiddleware = require("../../../core/middlewares/role.middleware");
+const { authorizeRoles } = require("../../../core/middlewares/role.middleware");
 const valid = require("../../../core/middlewares/validation.middleware");
 const {
   createProblemValidator,
@@ -12,39 +12,35 @@ const {
 
 router.use(authMiddleware.authenticate);
 
-router.get("/", getProblemsValidator, valid, problemController.getProblems);
+router.get("/", valid(getProblemsValidator), problemController.getProblems);
 router.get("/roadmap", problemController.getRoadmap);
 router.get("/progress", problemController.getProgressByDifficulty);
 
 router.post(
   "/",
-  roleMiddleware("admin"),
-  createProblemValidator,
-  valid,
+  authorizeRoles("admin"),
+  valid(createProblemValidator),
   problemController.createProblem
 );
 
 router.patch(
   "/:id",
-  roleMiddleware("admin"),
-  problemIdValidator,
-  updateProblemValidator,
-  valid,
+  authorizeRoles("admin"),
+  valid(problemIdValidator),
+  valid(updateProblemValidator),
   problemController.updateProblem
 );
 
 router.delete(
   "/:id",
-  roleMiddleware("admin"),
-  problemIdValidator,
-  valid,
+  authorizeRoles("admin"),
+  valid(problemIdValidator),
   problemController.deleteProblem
 );
 
 router.patch(
   "/:id/solved",
-  problemIdValidator,
-  valid,
+  valid(problemIdValidator),
   problemController.setProblemSolvedStatus
 );
 

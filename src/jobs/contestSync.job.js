@@ -2,52 +2,63 @@ const cron = require("node-cron");
 const contestSyncService = require("../modules/contests/services/contestSync.service");
 const logger = require("../core/utils/logger");
 
-/**
- * Scheduled job to sync contests from all platforms
- * Runs every 6 hours by default
- */
 class ContestSyncJob {
   constructor() {
     this.task = null;
-    // Default: Every 6 hours (0 */6 * * *)
     this.schedule = process.env.CONTEST_SYNC_CRON || "0 */6 * * *";
+    this.isRunning = false;
+    this.currentTimeout = null;
   }
 
-  /**
-   * Start the sync job
-   */
   start() {
-    logger.info(`Starting contest sync job with schedule: ${this.schedule}`);
+    if (cron.validate(this.schedule)) {
+      logger.info(`Starting contest sync job with schedule: ${this.schedule}`);
+      
+      this.task = cron.schedule(this.schedule, async () => {
+        if (this.isRunning) {
+          logger.warn("Contest sync already running, skipping this execution");
+          return;
+        }
+        
+        this.isRunning = true;
+        try {
+          logger.info("Running scheduled contest sync...");
+          const results = await contestSyncService.syncAllContests();
+          logger.info(
+            `Scheduled sync completed: ${results.new} new, ${results.updated} updated, ${results.failed.length} failed`
+          );
+        } catch (error) {
+          logger.error(`Scheduled contest sync failed: ${error.message}`);
+        } finally {
+          this.isRunning = false;
+        }
+      }, {
+        scheduled: true,
+        timezone: process.env.JOB_TIMEZONE || "Africa/Cairo"
+      });
 
-    this.task = cron.schedule(this.schedule, async () => {
-      try {
-        logger.info("Running scheduled contest sync...");
-        const results = await contestSyncService.syncAllContests();
-        logger.info(
-          `Scheduled sync completed: ${results.new} new, ${results.updated} updated, ${results.failed.length} failed`
-        );
-      } catch (error) {
-        logger.error(`Scheduled contest sync failed: ${error.message}`);
-      }
-    });
-
-    logger.info("Contest sync job started successfully");
+      logger.info("Contest sync job started successfully");
+    } else {
+      logger.error(`Invalid cron schedule: ${this.schedule}`);
+    }
   }
 
-  /**
-   * Stop the sync job
-   */
   stop() {
     if (this.task) {
       this.task.stop();
       logger.info("Contest sync job stopped");
     }
+    if (this.currentTimeout) {
+      clearTimeout(this.currentTimeout);
+    }
   }
 
-  /**
-   * Run sync immediately (manual trigger)
-   */
   async runNow() {
+    if (this.isRunning) {
+      throw new Error("Contest sync already running");
+    }
+    
+    this.isRunning = true;
     try {
       logger.info("Running manual contest sync...");
       const results = await contestSyncService.syncAllContests();
@@ -58,6 +69,8 @@ class ContestSyncJob {
     } catch (error) {
       logger.error(`Manual contest sync failed: ${error.message}`);
       throw error;
+    } finally {
+      this.isRunning = false;
     }
   }
 }

@@ -21,15 +21,15 @@ const valid = require("../../../core/middlewares/validation.middleware");
 router.use(authMiddleware.authenticate);
 
 // Bookmark routes
-router.post("/:id/bookmark", contestIdValidator, valid, bookmarkContest);
-router.delete("/:id/bookmark", contestIdValidator, valid, unbookmarkContest);
-router.get("/bookmarks", paginationValidator, valid, getBookmarkedContests);
-router.post("/:id/join", contestIdValidator, valid, joinContest);
+router.post("/:id/bookmark", valid(contestIdValidator), bookmarkContest);
+router.delete("/:id/bookmark", valid(contestIdValidator), unbookmarkContest);
+router.get("/bookmarks", valid(paginationValidator), getBookmarkedContests);
+router.post("/:id/join", valid(contestIdValidator), joinContest);
 
 // Reminder routes
-router.post("/:id/reminder", contestIdValidator, valid, setReminder);
-router.delete("/:id/reminder", contestIdValidator, valid, removeReminder);
-router.get("/reminders", paginationValidator, valid, getReminders);
-router.get("/history", participationHistoryValidator, valid, getParticipationHistory);
+router.post("/:id/reminder", valid(contestIdValidator), setReminder);
+router.delete("/:id/reminder", valid(contestIdValidator), removeReminder);
+router.get("/reminders", valid(paginationValidator), getReminders);
+router.get("/history", valid(participationHistoryValidator), getParticipationHistory);
 
 module.exports = router;
