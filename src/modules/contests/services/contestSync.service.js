@@ -4,9 +4,8 @@ const HackerRankAdapter = require("./contests/contests-hackerrankAdapter");
 const LeetCodeAdapter = require("./contests/contests-leetcodeAdapter");
 const logger = require("../../../core/utils/logger");
 
-/**
- * Service to sync contests from all platforms
- */
+const CONCURRENCY_LIMIT = 10;
+
 class ContestSyncService {
   constructor() {
     this.adapters = [
@@ -16,12 +15,10 @@ class ContestSyncService {
     ];
   }
 
-  /**
-   * Sync contests from all platforms
-   * @returns {Promise<Object>} Sync results
-   */
   async syncAllContests() {
     logger.info("Starting contest sync from all platforms...");
+    const startTime = Date.now();
+    
     const results = {
       success: [],
       failed: [],
@@ -30,42 +27,58 @@ class ContestSyncService {
       updated: 0,
     };
 
-    for (const adapter of this.adapters) {
+    const platformPromises = this.adapters.map(async (adapter) => {
       try {
         const platformResults = await this.syncPlatformContests(adapter);
-        results.success.push({
+        return {
           platform: adapter.platformName,
           ...platformResults,
-        });
-        results.total += platformResults.total;
-        results.new += platformResults.new;
-        results.updated += platformResults.updated;
+        };
       } catch (error) {
         logger.error(
           `Failed to sync ${adapter.platformName} contests: ${error.message}`
         );
-        results.failed.push({
+        return {
           platform: adapter.platformName,
           error: error.message,
+          failed: true
+        };
+      }
+    });
+
+    const platformResults = await Promise.all(platformPromises);
+    
+    for (const result of platformResults) {
+      if (result.failed) {
+        results.failed.push({
+          platform: result.platform,
+          error: result.error,
         });
+      } else {
+        results.success.push({
+          platform: result.platform,
+          total: result.total,
+          new: result.new,
+          updated: result.updated,
+        });
+        results.total += result.total;
+        results.new += result.new;
+        results.updated += result.updated;
       }
     }
 
     logger.info(
-      `Contest sync completed: ${results.new} new, ${results.updated} updated, ${results.failed.length} failed`
+      `Contest sync completed in ${Date.now() - startTime}ms: ${results.new} new, ${results.updated} updated, ${results.failed.length} failed`
     );
     return results;
   }
 
-  /**
-   * Sync contests from a specific platform
-   * @param {BaseContestAdapter} adapter - Platform adapter
-   * @returns {Promise<Object>} Platform sync results
-   */
   async syncPlatformContests(adapter, status) {
+    const startTime = Date.now();
     try {
       const contests = await adapter.fetchContests(status);
-      console.log("contests", contests);
+      logger.info(`Fetched ${contests.length} contests from ${adapter.platformName} in ${Date.now() - startTime}ms`);
+
       const results = {
         total: contests.length,
         new: 0,
@@ -73,17 +86,23 @@ class ContestSyncService {
         skipped: 0,
       };
 
-      for (const contestData of contests) {
-        try {
-          await this.saveContest(contestData, results);
-        } catch (error) {
-          logger.error(
-            `Error saving contest ${contestData.title}: ${error.message}`
-          );
-          results.skipped++;
+      const chunks = this.chunkArray(contests, CONCURRENCY_LIMIT);
+      
+      for (const chunk of chunks) {
+        const chunkResults = await Promise.all(
+          chunk.map((contestData) => this.saveContestSafe(contestData))
+        );
+        
+        for (const result of chunkResults) {
+          if (result === 'new') results.new++;
+          else if (result === 'updated') results.updated++;
+          else results.skipped++;
         }
       }
 
+      logger.info(
+        `Synced ${adapter.platformName} in ${Date.now() - startTime}ms: ${results.new} new, ${results.updated} updated`
+      );
       return results;
     } catch (error) {
       logger.error(
@@ -93,19 +112,32 @@ class ContestSyncService {
     }
   }
 
-  /**
-   * Save or update a single contest
-   * @param {Object} contestData - Normalized contest data
-   * @param {Object} results - Results object to update
-   */
+  chunkArray(array, size) {
+    const chunks = [];
+    for (let i = 0; i < array.length; i += size) {
+      chunks.push(array.slice(i, i + size));
+    }
+    return chunks;
+  }
+
+  async saveContestSafe(contestData) {
+    try {
+      return await this.saveContest(contestData, { new: 0, updated: 0 });
+    } catch (error) {
+      logger.error(
+        `Error saving contest ${contestData.title}: ${error.message}`
+      );
+      return 'error';
+    }
+  }
+
   async saveContest(contestData, results) {
     const existingContest = await Contest.findOne({
       platform: contestData.platform,
       contestIdOnPlatform: contestData.contestIdOnPlatform,
-    });
+    }).lean();
 
     if (existingContest) {
-      // Update existing contest
       const updated = await Contest.findByIdAndUpdate(
         existingContest._id,
         {
@@ -117,27 +149,18 @@ class ContestSyncService {
       
       if (updated) {
         results.updated++;
-        logger.info(
-          `Updated contest: ${contestData.title} (${contestData.platform})`
-        );
+        return 'updated';
       }
     } else {
-      // Create new contest
       const newContest = await Contest.create(contestData);
       if (newContest) {
         results.new++;
-        logger.info(
-          `Created new contest: ${contestData.title} (${contestData.platform})`
-        );
+        return 'new';
       }
     }
+    return 'skipped';
   }
 
-  /**
-   * Sync contests from a specific platform only
-   * @param {String} platformName - Platform name (codeforces, hackerrank, leetcode)
-   * @returns {Promise<Object>} Sync results
-   */
   async syncPlatform(platformName, status) {
     const adapter = this.adapters.find(
       (a) => a.platformName.toLowerCase() === platformName.toLowerCase()
@@ -148,23 +171,19 @@ class ContestSyncService {
     }
 
     logger.info(`Syncing contests from ${platformName}...`);
-    const results = await this.syncPlatformContests(adapter , status);
+    const results = await this.syncPlatformContests(adapter, status);
     logger.info(
       `${platformName} sync completed: ${results.new} new, ${results.updated} updated`
     );
     return results;
   }
 
-  /**
-   * Update contest statuses based on current time
-   * @returns {Promise<Object>} Update results
-   */
   async updateContestStatuses() {
+    const startTime = Date.now();
     try {
       logger.info("Updating contest statuses...");
       const now = new Date();
 
-      // Update upcoming contests that have started to "running"
       const startedContests = await Contest.updateMany(
         {
           status: "upcoming",
@@ -175,25 +194,39 @@ class ContestSyncService {
         }
       );
 
-      // Update running contests that have finished
-      const contests = await Contest.find({
+      const contestsToUpdate = await Contest.find({
         status: "running",
-      });
+      }).lean();
 
+      if (contestsToUpdate.length === 0) {
+        logger.info(`Status update completed in ${Date.now() - startTime}ms: 0 started, 0 finished`);
+        return { started: startedContests.modifiedCount, finished: 0 };
+      }
+
+      const bulkOps = [];
       let finishedCount = 0;
-      for (const contest of contests) {
+      
+      for (const contest of contestsToUpdate) {
         const endTime = new Date(
-          contest.startTime.getTime() + contest.duration * 60 * 1000
+          new Date(contest.startTime).getTime() + contest.duration * 60 * 1000
         );
         if (now >= endTime) {
-          contest.status = "finished";
-          await contest.save();
+          bulkOps.push({
+            updateOne: {
+              filter: { _id: contest._id },
+              update: { $set: { status: "finished" } },
+            },
+          });
           finishedCount++;
         }
       }
 
+      if (bulkOps.length > 0) {
+        await Contest.bulkWrite(bulkOps, { ordered: false });
+      }
+
       logger.info(
-        `Status update completed: ${startedContests.modifiedCount} started, ${finishedCount} finished`
+        `Status update completed in ${Date.now() - startTime}ms: ${startedContests.modifiedCount} started, ${finishedCount} finished`
       );
 
       return {

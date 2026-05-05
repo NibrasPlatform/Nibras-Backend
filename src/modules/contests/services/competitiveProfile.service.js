@@ -316,14 +316,33 @@ class CompetitiveProfileService {
 
   async refreshDueProfiles(limit = 50) {
     const accounts = await userCompetitiveAccountRepository.findDueSyncAccounts(limit);
+    
+    if (accounts.length === 0) {
+      return { syncedUsers: 0 };
+    }
+
+    const CONCURRENCY = 3;
     let syncedUsers = 0;
 
-    for (const account of accounts) {
-      await this.refreshUserProfile(account.userId);
-      syncedUsers += 1;
+    for (let i = 0; i < accounts.length; i += CONCURRENCY) {
+      const batch = accounts.slice(i, i + CONCURRENCY);
+      await Promise.all(
+        batch.map(async (account) => {
+          try {
+            await this.refreshUserProfile(account.userId);
+            syncedUsers++;
+          } catch (error) {
+            logger.warn(`Failed to sync profile for user ${account.userId}: ${error.message}`);
+          }
+        })
+      );
     }
 
     return { syncedUsers };
+  }
+
+  async getDueAccounts(limit = 50) {
+    return await userCompetitiveAccountRepository.findDueSyncAccounts(limit);
   }
 
   async syncProfileNow(userId, options = {}) {
