@@ -1,4 +1,5 @@
 const http = require("http");
+const mongoose = require("mongoose"); // ضفنا التعريف هنا عشان السيرفر ما يضربش
 
 const app = require("./app");
 const env = require("./core/config/env");
@@ -9,6 +10,14 @@ const { startAllJobs, stopAllJobs } = require("./jobs");
 
 const startServer = async () => {
   await connectDatabase();
+
+  mongoose.connection.on('connected', () => {
+    console.log('\n============================================');
+    console.log('✅ MongoDB Connected Successfully!');
+    console.log('📂 Database Name:', mongoose.connection.db.databaseName);
+    console.log('🌐 Host:', mongoose.connection.host);
+    console.log('============================================\n');
+  });
 
   const server = http.createServer(app);
   initSocket(server);

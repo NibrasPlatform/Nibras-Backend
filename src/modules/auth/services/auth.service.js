@@ -1,3 +1,4 @@
+require("../models/permission.model"); // ده بيسجل الموديل في المونجوس بسconst Role = require("../../models/role.model");
 let httpStatus = require("http-status");
 if (httpStatus.default) httpStatus = httpStatus.default;
 
@@ -134,11 +135,10 @@ const registerManual = async (userData) => {
 
   const otpCode = generateSixDigitOtp();
   await Otp.findOneAndUpdate(
-    { email: normalizedEmail },
-    { email: normalizedEmail, otp: otpCode, createdAt: new Date() },
-    { upsert: true, new: true, setDefaultsOnInsert: true }
-  );
-
+  { email: normalizedEmail },
+  { email: normalizedEmail, otp: otpCode, createdAt: new Date() },
+  { upsert: true, returnDocument: 'after', setDefaultsOnInsert: true } // التعديل هنا
+);
   await sendOtpEmail(normalizedEmail, otpCode);
   return { user: sanitizeUser(user) };
 };
