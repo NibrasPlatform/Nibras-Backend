@@ -82,6 +82,7 @@ class CodeforcesAdapter extends BaseContestAdapter {
       platform: "codeforces",
       contestIdOnPlatform: contest.id.toString(),
       url: `https://codeforces.com/contest/${contest.id}`,
+      joinUrl: `https://codeforces.com/contestRegistration/${contest.id}`,
       startTime: startTime,
       duration: Math.floor(durationSeconds / 60), // Convert to minutes
       status: status,
