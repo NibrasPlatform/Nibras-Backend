@@ -15,9 +15,11 @@ const deadlineSchema = new mongoose.Schema({
         required: true
     },
     dueDate: {
-        type: String,
+        type: Date,
         required: true
     }
 }, { timestamps: true });
+
+deadlineSchema.index({ studentId: 1 });
 
 module.exports = mongoose.models.Deadline || mongoose.model('Deadline', deadlineSchema);

@@ -1,9 +1,11 @@
 const UserContestParticipation = require("../models/userContestParticipation.model");
+const Contest = require("../models/contest.model");
+const activityEventService = require("../../gamification/services/activityEvent.service");
 
 const addParticipation = async (userId, contest, source) => {
   const now = new Date();
   try {
-    return await UserContestParticipation.findOneAndUpdate(
+    const participation = await UserContestParticipation.findOneAndUpdate(
       {
         userId,
         contestId: contest._id,
@@ -28,6 +30,12 @@ const addParticipation = async (userId, contest, source) => {
         runValidators: true,
       }
     );
+    await activityEventService.recordContestJoined({
+      userId,
+      contestId: contest._id,
+      occurredAt: participation.joinedAt || now,
+    });
+    return participation;
   } catch (error) {
     if (error?.code === 11000) {
       return UserContestParticipation.findOne({
@@ -96,7 +104,7 @@ const updateResult = async (userId, contestId, { rank, ratingChange }) => {
     updates.ratingChange = ratingChange;
   }
 
-  return UserContestParticipation.findOneAndUpdate(
+  const participation = await UserContestParticipation.findOneAndUpdate(
     {
       userId,
       contestId,
@@ -109,6 +117,43 @@ const updateResult = async (userId, contestId, { rank, ratingChange }) => {
       runValidators: true,
     }
   );
+
+  if (!participation) {
+    return null;
+  }
+
+  const contest = await Contest.findById(contestId).select("participantsCount");
+  const participantsCount = Number(contest?.participantsCount || 0);
+  const finalRank = Number(rank != null ? rank : participation.rank || 0);
+  if (participantsCount > 0 && finalRank > 0) {
+    const percentile = finalRank / participantsCount;
+    if (percentile <= 0.1) {
+      await activityEventService.recordContestPlacement({
+        userId,
+        contestId,
+        bucket: "top_10",
+        occurredAt: new Date(),
+      });
+    } else if (percentile <= 0.25) {
+      await activityEventService.recordContestPlacement({
+        userId,
+        contestId,
+        bucket: "top_25",
+        occurredAt: new Date(),
+      });
+    }
+  }
+
+  if (Number(ratingChange || 0) > 0) {
+    await activityEventService.recordContestRatingGain({
+      userId,
+      contestId,
+      ratingChange,
+      occurredAt: new Date(),
+    });
+  }
+
+  return participation;
 };
 
 module.exports = {

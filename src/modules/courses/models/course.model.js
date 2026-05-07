@@ -11,6 +11,8 @@ const courseSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+courseSchema.index({ instructor: 1 });
+
 courseSchema.pre("findOneAndDelete", async function (next) {
   const doc = await this.model.findOne(this.getQuery());
   if (doc) {

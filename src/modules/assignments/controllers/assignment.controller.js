@@ -19,7 +19,7 @@ const updateAssignment = catchAsync(async (req, res) => {
   const assignmentInstructorId = assignmentService.getAssignmentOwnerId(assignment);
   const isOwner =
     req.user.role.name === "Instructor" &&
-    assignmentInstructorId === (req.user.id || req.user._id).toString();
+    assignmentInstructorId === req.user._id.toString();
 
   if (!isAdmin && !isOwner) {
     return res.status(httpStatus.FORBIDDEN).json({
@@ -42,7 +42,7 @@ const deleteAssignment = catchAsync(async (req, res) => {
   const assignmentInstructorId = assignmentService.getAssignmentOwnerId(assignment);
   const isOwner =
     req.user.role.name === "Instructor" &&
-    assignmentInstructorId === (req.user.id || req.user._id).toString();
+    assignmentInstructorId === req.user._id.toString();
 
   if (!isAdmin && !isOwner) {
     return res.status(httpStatus.FORBIDDEN).json({
