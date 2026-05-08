@@ -9,9 +9,9 @@ const AppError = require("../../../core/utils/errorHandler");
 router.get("/", tagController.getAllTags);
 router.get("/popular", tagController.getPopularTags);
 router.get("/:id", tagController.getTagById);
-router.post("/", authMiddleware.authenticate, authorizeRoles("admin"), tagController.createTag);
-router.patch("/:id", authMiddleware.authenticate, authorizeRoles("admin"), tagController.updateTag);
-router.delete("/:id", authMiddleware.authenticate, authorizeRoles("admin"), tagController.deleteTag);
+router.post("/", authMiddleware.authenticate, authorizeRoles("Admin", "Super Admin"), tagController.createTag);
+router.patch("/:id", authMiddleware.authenticate, authorizeRoles("Admin", "Super Admin"), tagController.updateTag);
+router.delete("/:id", authMiddleware.authenticate, authorizeRoles("Admin", "Super Admin"), tagController.deleteTag);
 
 router.all('', (req, res, next) => {
     next(AppError.create('Route not found', 404, status.Fail));

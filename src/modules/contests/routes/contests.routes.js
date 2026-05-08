@@ -21,14 +21,14 @@ router.use(authMiddleware.authenticate);
 
 router.post(
   "/sync",
-  authorizeRoles("admin"),
+  authorizeRoles("Admin", "Super Admin"),
   valid(syncContestsValidator),
   syncContests
 );
 
 router.post(
   "/update-statuses",
-  authorizeRoles("admin"),
+  authorizeRoles("Admin", "Super Admin"),
   updateStatuses
 );
 
