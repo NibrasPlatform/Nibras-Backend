@@ -11,6 +11,8 @@ const progressCalculator = require("./progressCalculator.service");
 const logger = require("../../../core/utils/logger");
 const Problem = require("../../problems/models/problem.model");
 const UserProblemProgress = require("../../problems/models/userProblemProgress.model");
+const User = require("../../users/models/user.model");
+const activityEventService = require("../../gamification/services/activityEvent.service");
 
 class CompetitiveProfileService {
   constructor() {
@@ -115,27 +117,69 @@ class CompetitiveProfileService {
 
   async upsertSolvedProgress(userId, problemIds) {
     if (!Array.isArray(problemIds) || problemIds.length === 0) {
-      return 0;
+      return {
+        synced: 0,
+        matchedProblemIds: [],
+      };
     }
 
-    const solvedAt = new Date();
-    await UserProblemProgress.bulkWrite(
-      problemIds.map((problemId) => ({
-        updateOne: {
-          filter: { userId, problemId },
-          update: {
-            $set: {
-              solved: true,
-              solvedAt,
-            },
-          },
-          upsert: true,
-        },
-      })),
-      { ordered: false },
-    );
+    const existingRows = await UserProblemProgress.find({
+      userId,
+      problemId: { $in: problemIds },
+    })
+      .select("problemId solved solvedAt")
+      .lean();
 
-    return problemIds.length;
+    const existingByProblemId = new Map(existingRows.map((row) => [String(row.problemId), row]));
+    const newProblemIds = [];
+    const rowsToUpdate = [];
+    const solvedAt = new Date();
+
+    problemIds.forEach((problemId) => {
+      const existing = existingByProblemId.get(String(problemId));
+      if (!existing) {
+        newProblemIds.push(problemId);
+        return;
+      }
+
+      if (!existing.solved) {
+        rowsToUpdate.push(problemId);
+      }
+    });
+
+    if (newProblemIds.length > 0) {
+      await UserProblemProgress.insertMany(
+        newProblemIds.map((problemId) => ({
+          userId,
+          problemId,
+          solved: true,
+          solvedAt,
+        })),
+        { ordered: false },
+      );
+    }
+
+    if (rowsToUpdate.length > 0) {
+      await UserProblemProgress.updateMany(
+        {
+          userId,
+          problemId: { $in: rowsToUpdate },
+        },
+        {
+          $set: {
+            solved: true,
+          },
+          $setOnInsert: {
+            solvedAt,
+          },
+        },
+      );
+    }
+
+    return {
+      synced: newProblemIds.length + rowsToUpdate.length,
+      matchedProblemIds: [...newProblemIds, ...rowsToUpdate],
+    };
   }
 
   async syncSolvedRoadmapProblemsCodeforces(userId, solvedProblemRefs) {
@@ -183,7 +227,8 @@ class CompetitiveProfileService {
     const synced = await this.upsertSolvedProgress(userId, matchedProblemIds);
 
     return {
-      synced,
+      synced: synced.synced,
+      matchedProblemIds: synced.matchedProblemIds,
       matchedProblems: matchedProblemIds.length,
     };
   }
@@ -233,7 +278,8 @@ class CompetitiveProfileService {
     const synced = await this.upsertSolvedProgress(userId, matchedProblemIds);
 
     return {
-      synced,
+      synced: synced.synced,
+      matchedProblemIds: synced.matchedProblemIds,
       matchedProblems: matchedProblemIds.length,
     };
   }
@@ -516,6 +562,33 @@ class CompetitiveProfileService {
       
       // Calculate overall user progress after sync
       const userProgress = await progressCalculator.calculateUserProgress(userId);
+      const matchedProblemIds = [
+        ...(codeforcesSync.matchedProblemIds || []),
+        ...(leetcodeSync.matchedProblemIds || []),
+      ];
+      if (matchedProblemIds.length > 0) {
+        const uniqueProblemIds = [...new Set(matchedProblemIds.map((id) => String(id)))];
+        const problems = await Problem.find({ _id: { $in: uniqueProblemIds } })
+          .select("_id difficulty tags")
+          .lean();
+        for (const problem of problems) {
+          await activityEventService.recordProblemSolved({
+            userId,
+            problem,
+            occurredAt: syncTimestamp,
+          });
+        }
+      }
+
+      const userUpdates = {
+        problemsSolved: Number(userProgress?.overall?.solved || 0),
+      };
+      if (codeforcesResult?.profile?.rating != null) {
+        userUpdates.contestRating = Number(codeforcesResult.profile.rating || 0);
+      } else if (leetcodePlatformResult?.profile?.rating != null) {
+        userUpdates.contestRating = Number(leetcodePlatformResult.profile.rating || 0);
+      }
+      await User.findByIdAndUpdate(userId, { $set: userUpdates });
       
       const problemSyncStats = {
         codeforces: codeforcesSync,

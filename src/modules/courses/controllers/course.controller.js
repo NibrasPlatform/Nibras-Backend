@@ -6,7 +6,7 @@ const courseService = require("../services/course.service");
 
 const createCourse = catchAsync(async (req, res) => {
   const courseData = req.body;
-  courseData.instructor = req.user.id || req.user._id;
+  courseData.instructor = req.user._id;
 
   const course = await courseService.createCourse(courseData);
   res.status(httpStatus.CREATED).json({
@@ -53,7 +53,7 @@ const updateCourse = catchAsync(async (req, res) => {
   const courseInstructorId = course.instructor?._id
     ? course.instructor._id.toString()
     : course.instructor.toString();
-  const isOwner = req.user.role.name === "Instructor" && courseInstructorId === (req.user.id || req.user._id).toString();
+  const isOwner = req.user.role.name === "Instructor" && courseInstructorId === (req.user._id).toString();
 
   if (!isAdmin && !isOwner) {
     return res.status(httpStatus.FORBIDDEN).json({
@@ -78,7 +78,7 @@ const deleteCourse = catchAsync(async (req, res) => {
   const courseInstructorId = course.instructor?._id
     ? course.instructor._id.toString()
     : course.instructor.toString();
-  const isOwner = req.user.role.name === "Instructor" && courseInstructorId === (req.user.id || req.user._id).toString();
+  const isOwner = req.user.role.name === "Instructor" && courseInstructorId === (req.user._id).toString();
 
   if (!isAdmin && !isOwner) {
     return res.status(httpStatus.FORBIDDEN).json({

@@ -38,4 +38,7 @@ const assignmentSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+assignmentSchema.index({ courseId: 1 });
+assignmentSchema.index({ sectionId: 1 });
+
 module.exports = mongoose.models.Assignment || mongoose.model("Assignment", assignmentSchema);

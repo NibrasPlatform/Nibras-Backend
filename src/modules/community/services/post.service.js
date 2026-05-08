@@ -7,6 +7,12 @@ const { emitPostCreated } = require("../../../realtime/events");
 const ALLOWED_CREATE_FIELDS = ["body", "thread", "author"];
 const ALLOWED_UPDATE_FIELDS = ["body"];
 
+const normalizePagination = (page, limit) => {
+    const p = Math.max(Number(page) || 1, 1);
+    const l = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    return { page: p, limit: l, skip: (p - 1) * l };
+};
+
 const createPost = async (data) => {
     const safeData = Object.fromEntries(
         Object.entries(data).filter(([key]) => ALLOWED_CREATE_FIELDS.includes(key))
@@ -27,10 +33,7 @@ const createPost = async (data) => {
 
     const post = await Post.create(safeData);
 
-    // Increment postsCount on the thread
-    await Thread.findByIdAndUpdate(safeData.thread, {
-        $inc: { postsCount: 1 },
-    });
+    await Thread.findByIdAndUpdate(safeData.thread, { $inc: { postsCount: 1 } });
 
     const populated = await Post.findById(post._id).populate("author", "name avatar role");
 
@@ -39,27 +42,23 @@ const createPost = async (data) => {
     return populated;
 };
 
-const getPostsByThread = async (threadId) => {
-    const posts = await Post.find({ thread: threadId })
-        .populate("author", "name avatar role")
-        .sort({ createdAt: 1 });
+const getPostsByThread = async (threadId, { page = 1, limit = 20 } = {}) => {
+    const { page: p, limit: l, skip } = normalizePagination(page, limit);
 
-    // Mirror answer.service.js sorting: pinned > accepted > votes > createdAt
-    posts.sort((a, b) => {
-        const aPinned = a.isPinned ? 1 : 0;
-        const bPinned = b.isPinned ? 1 : 0;
-        if (aPinned !== bPinned) return bPinned - aPinned;
+    // Sort: pinned first, then accepted, then votes, then chronological
+    const [posts, total] = await Promise.all([
+        Post.find({ thread: threadId })
+            .populate("author", "name avatar role")
+            .sort({ isPinned: -1, isAccepted: -1, votesCount: -1, createdAt: 1 })
+            .skip(skip)
+            .limit(l),
+        Post.countDocuments({ thread: threadId }),
+    ]);
 
-        const aAccepted = a.isAccepted ? 1 : 0;
-        const bAccepted = b.isAccepted ? 1 : 0;
-        if (aAccepted !== bAccepted) return bAccepted - aAccepted;
-
-        if (b.votesCount !== a.votesCount) return b.votesCount - a.votesCount;
-
-        return a.createdAt - b.createdAt;
-    });
-
-    return posts;
+    return {
+        posts,
+        pagination: { page: p, limit: l, total, totalPages: Math.ceil(total / l) || 1 },
+    };
 };
 
 const getPostById = async (id) => {
@@ -82,9 +81,7 @@ const deletePost = async (id) => {
     const post = await Post.findByIdAndDelete(id);
 
     if (post && post.thread) {
-        await Thread.findByIdAndUpdate(post.thread, {
-            $inc: { postsCount: -1 },
-        });
+        await Thread.findByIdAndUpdate(post.thread, { $inc: { postsCount: -1 } });
     }
 
     return post;
@@ -122,7 +119,6 @@ const acceptPost = async (postId, requestingUserId) => {
         );
     }
 
-    // Unset isAccepted on all other posts in this thread
     await Post.updateMany(
         { thread: post.thread, _id: { $ne: postId } },
         { $set: { isAccepted: false } }
