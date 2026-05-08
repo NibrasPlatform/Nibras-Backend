@@ -9,7 +9,7 @@ const User = require("../../users/models/user.model");
 const Token = require("../models/token.model");
 const Otp = require("../models/otp.model");
 const tokenService = require("./token.service");
-
+const axios = require("axios"); 
 const rolePopulateOptions = {
   path: "role",
   populate: { path: "permissions" },
@@ -173,21 +173,25 @@ const verifyOtp = async ({ email, otp }) => {
   return { tokens, user: sanitizeUser(user) };
 };
 
-const googleLogin = async ({ idToken }) => {
-  if (!idToken) {
-    throw createServiceError("idToken is required.");
+const googleLogin = async ({ access_token }) => {
+  if (!access_token) {
+    throw createServiceError("access_token is required.");
   }
 
-  if (!process.env.GOOGLE_CLIENT_ID) {
-    throw createServiceError("GOOGLE_CLIENT_ID is missing.", httpStatus.INTERNAL_SERVER_ERROR);
+  let payload;
+  try {
+    // هنجيب بيانات اليوزر من جوجل باستخدام التوكن
+    const googleResponse = await axios.get(
+      "https://www.googleapis.com/oauth2/v3/userinfo",
+      {
+        headers: { Authorization: `Bearer ${access_token}` },
+      }
+    );
+    payload = googleResponse.data;
+  } catch (error) {
+    throw createServiceError("Invalid Google access token.", httpStatus.UNAUTHORIZED);
   }
 
-  const ticket = await getGoogleClient().verifyIdToken({
-    idToken,
-    audience: process.env.GOOGLE_CLIENT_ID,
-  });
-
-  const payload = ticket.getPayload();
   const normalizedEmail = String(payload?.email || "").trim().toLowerCase();
 
   if (!payload?.email_verified) {
@@ -204,6 +208,7 @@ const googleLogin = async ({ idToken }) => {
   }
 
   let user = await User.findOne({ email: normalizedEmail });
+  
   if (!user) {
     user = await User.create({
       name: payload?.name || "Google User",
@@ -221,6 +226,7 @@ const googleLogin = async ({ idToken }) => {
     await user.save();
   }
 
+  // نطلع الـ Tokens بتاعت نبراس ونرجعها للكنترولر
   const populatedUser = await User.findById(user._id).populate(rolePopulateOptions);
   const tokens = await tokenService.generateAuthTokens(populatedUser);
   return { tokens, user: sanitizeUser(populatedUser) };

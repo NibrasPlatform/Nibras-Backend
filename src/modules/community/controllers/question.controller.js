@@ -1,159 +1,90 @@
+const catchAsync = require("../../../core/utils/catchAsync");
+const AppError = require("../../../core/utils/errorHandler");
 const questionService = require('../services/question.service.js');
 const answerService = require('../services/answer.service.js');
-const AppError = require("../../../core/utils/errorHandler");
 const status = require("../../../core/constants/httpStatus");
 
-const createQuestion = async (req, res, next) => {
-    try {
-        const { title, body, tags, course } = req.body;
+const createQuestion = catchAsync(async (req, res) => {
+    const { title, body, tags, course } = req.body;
 
-        if (title !== undefined && !String(title).trim()) {
-            return next(AppError.create('Title cannot be empty', 400, status.Fail));
-        }
-
-        if (body !== undefined && !String(body).trim()) {
-            return next(AppError.create('Body cannot be empty', 400, status.Fail));
-        }
-
-        if (!title || !body) {
-            return next(AppError.create('Title and body are required', 400, status.Fail));
-        }
-
-        const payload = {
-            title: String(title).trim(),
-            body: String(body).trim(),
-            tags: tags || [],
-            course: course,
-        };
-
-        if (req.user && req.user._id) {
-            payload.author = req.user._id;
-        }
-
-        const question = await questionService.createQuestion(payload);
-        res.status(201).json({ message: 'Question created successfully', question });
-    } catch (err) {
-        next(err);
+    if (!title || !String(title).trim()) {
+        throw AppError.create('Title is required', 400, status.Fail);
     }
-};
-
-const getQuestions = async (req, res, next) => {
-    try {
-        const filters = {
-            search: req.query.search,
-            title: req.query.title,
-            tag: req.query.tag,
-            course: req.query.course,
-        };
-        const questions = await questionService.getQuestions(filters);
-        res
-            .status(200)
-            .json({ message: 'Questions fetched successfully', questions });
-
-    } catch (err) {
-        next(err);
+    if (!body || !String(body).trim()) {
+        throw AppError.create('Body is required', 400, status.Fail);
     }
-};
 
-const getSingleQuestion = async (req, res, next) => {
-    try {
-        const question = await questionService.getQuestionById(req.params.id);
-        if (!question) {
-            return next(AppError.create('Question not found', 404, status.Fail));
-        }
+    const payload = {
+        title: String(title).trim(),
+        body: String(body).trim(),
+        tags: tags || [],
+        course,
+        author: req.user._id,
+    };
 
-        const answers = await answerService.getAnswersForQuestion(req.params.id);
+    const question = await questionService.createQuestion(payload);
+    res.status(201).json({ success: true, message: 'Question created successfully', data: { question } });
+});
 
-        res.status(200).json({
-            message: 'Question fetched successfully',
-            question,
-            answers,
-        });
-    } catch (err) {
-        next(err);
+const getQuestions = catchAsync(async (req, res) => {
+    const result = await questionService.getQuestions({
+        search: req.query.search,
+        title: req.query.title,
+        tag: req.query.tag,
+        course: req.query.course,
+        page: req.query.page,
+        limit: req.query.limit,
+    });
+    res.status(200).json({ success: true, message: 'Questions fetched successfully', data: result });
+});
+
+const getSingleQuestion = catchAsync(async (req, res) => {
+    const question = await questionService.getQuestionById(req.params.id);
+    if (!question) throw AppError.create('Question not found', 404, status.Fail);
+
+    const { answers, pagination: answerPagination } = await answerService.getAnswersForQuestion(req.params.id);
+
+    res.status(200).json({
+        success: true,
+        message: 'Question fetched successfully',
+        data: { question, answers, answerPagination },
+    });
+});
+
+const updateQuestion = catchAsync(async (req, res) => {
+    const question = await questionService.getQuestionById(req.params.id);
+    if (!question) throw AppError.create('Question not found', 404, status.Fail);
+
+    const authorId = question.author._id || question.author;
+    if (String(authorId) !== String(req.user._id)) {
+        throw AppError.create('You are not allowed to update this question', 403, status.Fail);
     }
-};
 
-const updateQuestion = async (req, res, next) => {
-    try {
-        const question = await questionService.getQuestionById(req.params.id);
-        if (!question) {
-            return next(AppError.create('Question not found', 404, status.Fail));
-        }
+    const { title, body, tags, course } = req.body;
+    if (title !== undefined && !String(title).trim()) throw AppError.create('Title cannot be empty', 400, status.Fail);
+    if (body !== undefined && !String(body).trim()) throw AppError.create('Body cannot be empty', 400, status.Fail);
 
-        const authorId = question.author._id || question.author;
-        if (!req.user || String(authorId) !== String(req.user._id)) {
-            return next(
-                AppError.create(
-                    'You are not allowed to update this question',
-                    403,
-                    status.Fail
-                )
-            );
-        }
+    const payload = {};
+    if (title !== undefined) payload.title = String(title).trim();
+    if (body !== undefined) payload.body = String(body).trim();
+    if (tags !== undefined) payload.tags = tags;
+    if (course !== undefined) payload.course = course;
 
-        const { title, body, tags, course } = req.body;
+    const updated = await questionService.updateQuestion(req.params.id, payload);
+    res.status(200).json({ success: true, message: 'Question updated successfully', data: { question: updated } });
+});
 
-        if (title !== undefined && !String(title).trim()) {
-            return next(AppError.create('Title cannot be empty', 400, status.Fail));
-        }
+const deleteQuestion = catchAsync(async (req, res) => {
+    const question = await questionService.getQuestionById(req.params.id);
+    if (!question) throw AppError.create('Question not found', 404, status.Fail);
 
-        if (body !== undefined && !String(body).trim()) {
-            return next(AppError.create('Body cannot be empty', 400, status.Fail));
-        }
-
-        const payload = {};
-        if (title !== undefined) payload.title = String(title).trim();
-        if (body !== undefined) payload.body = String(body).trim();
-        if (tags !== undefined) payload.tags = tags;
-        if (course !== undefined) payload.course = course;
-
-        const updated = await questionService.updateQuestion(req.params.id, payload);
-
-        res
-            .status(200)
-            .json({ message: 'Question updated successfully', question: updated });
-    } catch (err) {
-        next(err);
+    const authorId = question.author._id || question.author;
+    if (String(authorId) !== String(req.user._id)) {
+        throw AppError.create('You are not allowed to delete this question', 403, status.Fail);
     }
-};
 
-const deleteQuestion = async (req, res, next) => {
-    try {
-        // if (!req.user || req.user.role !== 'admin') {
-        //     return next(
-        //         AppError.create(
-        //             'Only admin can delete questions',
-        //             403,
-        //             status.Fail
-        //         )
-        //     );
-        // }
-        const question = await questionService.getQuestionById(req.params.id);
-        if (!question) {
-            return next(AppError.create('Question not found', 404, status.Fail));
-        }
-            const authorId = question.author._id || question.author;
-        if (!req.user || String(authorId) !== String(req.user._id)) {
-            return next(
-                AppError.create(
-                    'You are not allowed to delete this question',
-                    403,
-                    status.Fail
-                )
-            );
-        }
-        await questionService.deleteQuestion(req.params.id);
-        res.status(200).json({ message: 'Question deleted successfully' });
-    } catch (err) {
-        next(err);
-    }
-};
+    await questionService.deleteQuestion(req.params.id);
+    res.status(200).json({ success: true, message: 'Question deleted successfully' });
+});
 
-module.exports = {
-    createQuestion,
-    getQuestions,
-    getSingleQuestion,
-    updateQuestion,
-    deleteQuestion,
-};
+module.exports = { createQuestion, getQuestions, getSingleQuestion, updateQuestion, deleteQuestion };

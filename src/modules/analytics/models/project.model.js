@@ -19,9 +19,11 @@ const projectSchema = new mongoose.Schema({
         default: 0
     },
     dueDate: {
-        type: String,
+        type: Date,
         required: true
     }
 }, { timestamps: true });
+
+projectSchema.index({ studentId: 1 });
 
 module.exports = mongoose.models.Project || mongoose.model('Project', projectSchema);

@@ -1,21 +1,11 @@
+const catchAsync = require("../../../core/utils/catchAsync");
+const AppError = require("../../../core/utils/errorHandler");
 const userService = require("../services/user.service");
 
-const getMe = async (req, res, next) => {
-  try {
-    const user = await userService.getById(req.user.id || req.user._id);
-    if (!user) {
-      return res.status(404).json({ success: false, message: "User not found." });
-    }
+const getMe = catchAsync(async (req, res) => {
+  const user = await userService.getById(req.user._id);
+  if (!user) throw AppError.create("User not found", 404, "fail");
+  res.status(200).json({ success: true, message: "Profile fetched successfully", data: user });
+});
 
-    res.status(200).json({
-      success: true,
-      data: user,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-module.exports = {
-  getMe,
-};
+module.exports = { getMe };

@@ -20,4 +20,6 @@ const sectionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+sectionSchema.index({ courseId: 1 });
+
 module.exports = mongoose.models.Section || mongoose.model("Section", sectionSchema);

@@ -1,141 +1,102 @@
-const answerService = require("../services/answer.service.js");
+const catchAsync = require("../../../core/utils/catchAsync");
 const AppError = require("../../../core/utils/errorHandler");
-const status = require("../../../core/constants/httpStatus");
-const mongoose = require('mongoose');
+const answerService = require("../services/answer.service.js");
+const mongoose = require("mongoose");
 
-const createAnswer = async (req, res, next) => {
-    try {
-        const { body } = req.body;
+const createAnswer = catchAsync(async (req, res) => {
+    const { body } = req.body;
 
-        if (!body || !String(body).trim()) {
-            return next(AppError.create("Answer body cannot be empty", 400, status.Fail));
-        }
-
-        if (!mongoose.Types.ObjectId.isValid(req.params.questionId)) {
-            return next(AppError.create("Invalid question ID", 400, status.Fail));
-        }
-
-        const payload = {
-            body: String(body).trim(),
-            author: req.user._id,
-            question: req.params.questionId,
-        };
-
-        const answer = await answerService.createAnswer(payload);
-        res.status(201).json({ message: "Answer created successfully", answer });
-    } catch (err) {
-        next(AppError.create(err.message, err.statusCode || 500, status.Error));
+    if (!body || !String(body).trim()) {
+        throw AppError.create("Answer body cannot be empty", 400, "fail");
     }
-};
 
-const getAnswersForQuestion = async (req, res, next) => {
-    try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.questionId)) {
-            return next(AppError.create("Invalid question ID", 400, status.Fail));
-        }
-
-        const answers = await answerService.getAnswersForQuestion(req.params.questionId);
-        res.status(200).json({ message: "Answers fetched successfully", answers });
-    } catch (err) {
-        next(AppError.create(err.message, 500, status.Error));
+    if (!mongoose.Types.ObjectId.isValid(req.params.questionId)) {
+        throw AppError.create("Invalid question ID", 400, "fail");
     }
-};
 
-const getAnswersForUser = async (req, res, next) => {
-    try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
-            return next(AppError.create("Invalid user ID", 400, status.Fail));
-        }
+    const payload = {
+        body: String(body).trim(),
+        author: req.user._id,
+        question: req.params.questionId,
+    };
 
-        const answers = await answerService.getAnswersForUser(req.params.userId);
-        res.status(200).json({ message: "User comments fetched successfully", answers });
-    } catch (err) {
-        next(AppError.create(err.message, 500, status.Error));
+    const answer = await answerService.createAnswer(payload);
+    res.status(201).json({ success: true, message: "Answer created successfully", data: { answer } });
+});
+
+const getAnswersForQuestion = catchAsync(async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.questionId)) {
+        throw AppError.create("Invalid question ID", 400, "fail");
     }
-};
 
-const getAnswerById = async (req, res, next) => {
-    try {
-        const answer = await answerService.getAnswerById(req.params.id);
-        if (!answer) {
-            return next(AppError.create("Answer not found", 404, status.Fail));
-        }
-        res.status(200).json({ message: "Answer fetched successfully", answer });
-    } catch (err) {
-        next(AppError.create(err.message, 500, status.Error));
+    const { answers, pagination } = await answerService.getAnswersForQuestion(req.params.questionId, {
+        page: req.query.page,
+        limit: req.query.limit,
+    });
+    res.status(200).json({ success: true, message: "Answers fetched successfully", data: { answers, pagination } });
+});
+
+const getAnswersForUser = catchAsync(async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.userId)) {
+        throw AppError.create("Invalid user ID", 400, "fail");
     }
-};
 
-const updateAnswer = async (req, res, next) => {
-    try {
-        const { body } = req.body;
+    const { answers, pagination } = await answerService.getAnswersForUser(req.params.userId, {
+        page: req.query.page,
+        limit: req.query.limit,
+    });
+    res.status(200).json({ success: true, message: "User answers fetched successfully", data: { answers, pagination } });
+});
 
-        if (body !== undefined && !String(body).trim()) {
-            return next(AppError.create("Answer body cannot be empty", 400, status.Fail));
-        }
+const getAnswerById = catchAsync(async (req, res) => {
+    const answer = await answerService.getAnswerById(req.params.id);
+    if (!answer) throw AppError.create("Answer not found", 404, "fail");
+    res.status(200).json({ success: true, message: "Answer fetched successfully", data: { answer } });
+});
 
-        const answer = await answerService.getAnswerById(req.params.id);
-        if (!answer) {
-            return next(AppError.create("Answer not found", 404, status.Fail));
-        }
+const updateAnswer = catchAsync(async (req, res) => {
+    const { body } = req.body;
 
-        if (!req.user || String(answer.author._id || answer.author) !== String(req.user._id)) {
-            return next(
-                AppError.create(
-                    "You are not allowed to update this answer",
-                    403,
-                    status.Fail
-                )
-            );
-        }
-        const payload = {};
-        if (body !== undefined) payload.body = String(body).trim();
-
-        const updatedAnswer = await answerService.updateAnswer(req.params.id, payload);
-        res
-            .status(200)
-            .json({ message: "Answer updated successfully", answer: updatedAnswer });
-    } catch (err) {
-        next(AppError.create(err.message, 500, status.Error));
+    if (body !== undefined && !String(body).trim()) {
+        throw AppError.create("Answer body cannot be empty", 400, "fail");
     }
-};
 
-const deleteAnswer = async (req, res, next) => {
-    try {
-        const answer = await answerService.getAnswerById(req.params.id);
-        if (!answer) {
-            return next(AppError.create("Answer not found", 404, status.Fail));
-        }
+    const answer = await answerService.getAnswerById(req.params.id);
+    if (!answer) throw AppError.create("Answer not found", 404, "fail");
 
-        if (!req.user || String(answer.author._id || answer.author) !== String(req.user._id)) {
-            return next(
-                AppError.create(
-                    "You are not allowed to delete this answer",
-                    403,
-                    status.Fail
-                )
-            );
-        }
-
-        await answerService.deleteAnswer(req.params.id);
-        res.status(200).json({ message: "Answer deleted successfully" });
-    } catch (err) {
-        next(AppError.create(err.message, 500, status.Error));
+    const authorId = answer.author._id || answer.author;
+    if (String(authorId) !== String(req.user._id)) {
+        throw AppError.create("You are not allowed to update this answer", 403, "fail");
     }
-};
 
-const acceptAnswer = async (req, res, next) => {
-    try {
-        if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
-            return next(AppError.create("Invalid answer ID", 400, status.Fail));
-        }
+    const payload = {};
+    if (body !== undefined) payload.body = String(body).trim();
 
-        const answer = await answerService.acceptAnswer(req.params.id, req.user._id);
-        res.status(200).json({ message: "Answer accepted successfully", answer });
-    } catch (err) {
-        next(AppError.create(err.message, err.statusCode || 500, status.Error));
+    const updatedAnswer = await answerService.updateAnswer(req.params.id, payload);
+    res.status(200).json({ success: true, message: "Answer updated successfully", data: { answer: updatedAnswer } });
+});
+
+const deleteAnswer = catchAsync(async (req, res) => {
+    const answer = await answerService.getAnswerById(req.params.id);
+    if (!answer) throw AppError.create("Answer not found", 404, "fail");
+
+    const authorId = answer.author._id || answer.author;
+    if (String(authorId) !== String(req.user._id)) {
+        throw AppError.create("You are not allowed to delete this answer", 403, "fail");
     }
-};
+
+    await answerService.deleteAnswer(req.params.id);
+    res.status(200).json({ success: true, message: "Answer deleted successfully" });
+});
+
+const acceptAnswer = catchAsync(async (req, res) => {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+        throw AppError.create("Invalid answer ID", 400, "fail");
+    }
+
+    const answer = await answerService.acceptAnswer(req.params.id, req.user._id);
+    res.status(200).json({ success: true, message: "Answer accepted successfully", data: { answer } });
+});
 
 module.exports = {
     createAnswer,

@@ -1,13 +1,14 @@
 const express = require("express");
 const authController = require("../controllers/auth.controller");
 const { authenticate } = require("../../../core/middlewares/auth.middleware");
+const rateLimiter = require("../../../core/middlewares/rateLimiter.middleware");
 
 const router = express.Router();
 
-router.post("/register", authController.registerManual);
-router.post("/verify-otp", authController.verifyOtp);
+router.post("/register", rateLimiter.middleware(3, 60000), authController.registerManual);
+router.post("/verify-otp", rateLimiter.middleware(5, 60000), authController.verifyOtp);
 router.post("/google", authController.googleLogin);
-router.post("/login", authController.login);
+router.post("/login", rateLimiter.middleware(5, 60000), authController.login);
 router.post("/refresh-tokens", authController.refreshTokens);
 
 router.get("/me", authenticate, authController.getMe);
