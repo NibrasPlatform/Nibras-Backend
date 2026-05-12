@@ -52,5 +52,7 @@ const progressSchema = new mongoose.Schema(
 
 // Unique index on userId and courseId
 progressSchema.index({ userId: 1, courseId: 1 }, { unique: true });
+// Index for course-level queries (course performance dashboard)
+progressSchema.index({ courseId: 1 });
 
 module.exports = mongoose.models.Progress || mongoose.model("Progress", progressSchema);

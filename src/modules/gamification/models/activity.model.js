@@ -20,4 +20,7 @@ const activitySchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// Index for student activity lookups
+activitySchema.index({ studentId: 1 });
+
 module.exports = mongoose.models.Activity || mongoose.model('Activity', activitySchema);

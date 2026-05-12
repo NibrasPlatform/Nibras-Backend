@@ -37,5 +37,7 @@ const submissionSchema = new mongoose.Schema(
 );
 
 submissionSchema.index({ userId: 1, courseId: 1, assignmentId: 1 }, { unique: true });
+// Index for course-level aggregation (course performance dashboard)
+submissionSchema.index({ courseId: 1 });
 
 module.exports = mongoose.models.Submission || mongoose.model("Submission", submissionSchema);

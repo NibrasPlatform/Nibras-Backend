@@ -18,6 +18,9 @@ const studentAchievementSchema = new mongoose.Schema({
 });
 
  
+// Index for student achievement lookups
+studentAchievementSchema.index({ studentId: 1 });
+
 studentAchievementSchema.statics.findOrCreate = function(studentId, achievementId) {
     return this.findOne({ studentId, achievementId })
         .then(existing => {
