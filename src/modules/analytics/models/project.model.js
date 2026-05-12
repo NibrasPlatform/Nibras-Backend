@@ -24,4 +24,7 @@ const projectSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// Index for student project lookups
+projectSchema.index({ studentId: 1 });
+
 module.exports = mongoose.models.Project || mongoose.model('Project', projectSchema);
