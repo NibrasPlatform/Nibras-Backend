@@ -1,235 +1,202 @@
-# Nibras Modular Monolith
+# Nibras Frontend Integration Guide
+This document is the frontend integration reference for the Nibras backend. It focuses on the student dashboard, course details, progress tracking, AI grade payloads, and submission flows.
 
-A unified modular monolith backend for the Nibras Student Dashboard platform.
+## Authentication
 
-## 📁 Project Structure
+All API routes below require a Bearer token.
 
-```
-All/
-├── src/
-│   ├── app.js                    # Express app setup
-│   ├── server.js                 # Server entry point
-│   ├── routes/index.js            # API route registration
-│   │
-│   ├── core/                    # Shared core modules
-│   │   ├── config/               # Database, env, logger config
-│   │   ├── constants/            # HTTP status, platforms
-│   │   ├── middlewares/          # Auth, role, validation, error, rate limiter
-│   │   └── utils/              # Error handler, token, catchAsync, logger
-│   │
-│   ├── modules/                 # Feature modules
-│   │   ├── auth/               # Authentication & roles
-│   │   ├── users/             # User management
-│   │   ├── courses/           # Course management
-│   │   ├── assignments/       # Assignment management
-│   │   ├── contests/         # Contest platform sync
-│   │   ├── problems/         # Problem tracking
-│   │   ├── community/        # Q&A, threads, votes
-│   │   ├── gamification/     # Badges & achievements
-│   │   └── analytics/        # Dashboard data
-│   │
-│   ├── jobs/                   # Background jobs
-│   ├── realtime/              # Socket.IO events
-│   └── scripts/               # Migration & seed scripts
-│
-└── package.json
+### Base URL
+
+| Environment | Value |
+|---|---|
+| Base URL | `http://localhost:3000/api` |
+
+### Required Header
+
+```http
+Authorization: Bearer <access-token>
 ```
 
-## 🚀 Getting Started
+### Notes
 
-### Prerequisites
-- Node.js 18+
-- MongoDB
+- The token must belong to an authenticated user.
+- Endpoints that fetch progress or dashboard data use the authenticated user ID on the backend.
+- Some course management endpoints are restricted to instructor/admin roles.
 
-### Installation
-
-```bash
-npm install
-```
-
-### Environment Variables
-
-Create `.env` file:
-
-```env
-# Database
-DATABASE_URL=mongodb://localhost:27017/nibras
-
-# JWT
-JWT_SECRET=your-secret-key
-JWT_REFRESH_SECRET=your-refresh-secret
-
-# Google OAuth (optional)
-GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
-
-# Email (optional)
-BREVO_API_KEY=your-brevo-api-key
-```
-
-### Running
-
-```bash
-# Development
-npm run st
-
-# Production
-npm start
-```
-
-### First-Time Setup
-
-```bash
-# Seed roles and default admin
-npm run seed:roles
-```
-
-This creates:
-- 5 permissions
-- 4 roles (Super Admin, Admin, Instructor, Student)
-- Default admin: ahmed.admin@nibras.com / Admin@123
-
-## 📡 API Endpoints
-
-### Authentication
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| POST | /api/auth/register | Register new user |
-| POST | /api/auth/verify-otp | Verify OTP |
-| POST | /api/auth/login | Login |
-| POST | /api/auth/google | Google OAuth |
-| POST | /api/auth/refresh-tokens | Refresh tokens |
-| GET | /api/auth/me | Get current user |
-| POST | /api/auth/logout | Logout |
-
-### Users
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| GET | /api/users/:id | Get user profile |
+## Endpoints
 
 ### Courses
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| GET | /api/courses | List courses |
-| GET | /api/courses/:courseId | Get course |
-| POST | /api/courses | Create course (admin) |
-| PATCH | /api/courses/:courseId | Update course |
-| DELETE | /api/courses/:courseId | Delete course |
 
-### Assignments
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| GET | /api/assignments/course/:courseId | List assignments |
-| POST | /api/assignments | Create (admin) |
-| PATCH | /api/assignments/:id | Update |
-| DELETE | /api/assignments/:id | Delete |
+| Method | Endpoint | Auth | Purpose | Key Response Notes |
+|---|---|---:|---|---|
+| GET | `/courses/my-dashboard` | Yes | Returns dashboard stats and course cards for the current student. | Returns `stats` and `courses`. Each course includes `hasStarted`, `progressPercentage`, `status`, `assignmentsCount`, `instructorName`, `level`, and `category`. |
+| GET | `/courses/:courseId` | Yes | Returns full course details and section status for the sidebar. | Each section includes `status: locked | available | completed`. |
+| GET | `/courses` | Yes | Lists courses with query filters. | Supports `level`, `category`, `search`, `page`, `limit`, `sortBy`, `sortOrder`. |
+| GET | `/courses/level/:level` | Yes | Returns courses filtered by academic level. | Level match is case-insensitive. |
+| GET | `/courses/code/:code` | Yes | Fetches a course by course code. | Case-insensitive code lookup. |
+| POST | `/courses` | Yes | Creates a new course. | Instructor/admin only. |
+| PATCH | `/courses/:courseId` | Yes | Updates course metadata. | Instructor/admin only. |
+| DELETE | `/courses/:courseId` | Yes | Deletes a course and its associated sections. | Instructor/admin only. |
+| POST | `/courses/:courseId/sections` | Yes | Adds a new section/lecture to a course. | Instructor/admin only. |
 
-### Contests
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| GET | /api/contests | List contests |
-| POST | /api/contests/sync | Sync (admin) |
-| POST | /api/contests/join | Join contest |
-| GET | /api/contests/bookmarked | My bookmarks |
-| POST | /api/contests/:id/reminder | Set reminder |
+### Progress
 
-### Accounts
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| POST | /api/contests/accounts/link | Link platform |
-| POST | /api/contests/accounts/verify | Verify account |
+| Method | Endpoint | Auth | Purpose | Payload / Notes |
+|---|---|---:|---|---|
+| GET | `/courses/:courseId/progress` | Yes | Fetches the current student progress for a course. | Returns section item states (`locked`, `available`, `completed`), overall `percentage`, and `status`. |
+| POST | `/courses/:courseId/sections/:sectionId/toggle` | Yes | Marks a section as complete/incomplete. | Body: `{ "isCompleted": true/false }`. Triggers sequential unlocking and progress updates. |
+| GET | `/courses/progress/global` | Yes | Returns the student’s global progress overview. | Returns average progress across all progress records for the user. |
 
-### Problems
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| GET | /api/problems | List problems |
-| GET | /api/problems/:id | Get problem |
-| PATCH | /api/problems/:id/solved | Mark solved |
+### Assignment Submissions
 
-### Community
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| GET | /api/community/questions | List questions |
-| POST | /api/community/questions | Ask question |
-| GET | /api/community/answers | List answers |
-| POST | /api/community/answers | Answer |
-| POST | /api/community/votes | Vote |
-| GET | /api/community/threads | List threads |
-| POST | /api/community/threads | Create thread |
-| GET | /api/community/chatbot | AI chatbot |
+| Method | Endpoint | Auth | Purpose | Notes |
+|---|---|---:|---|---|
+| POST | `/submissions` | Yes | Creates or updates a student assignment submission. | Expects `courseId`, `assignmentId`, and `githubLink`. The backend upserts by student/course/assignment. |
+| PATCH | `/submissions/:submissionId/status` | Yes | Admin/instructor review for submission status. | If status becomes `approved`, the backend updates progress boosting logic. |
 
-### Gamification
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| POST | /api/gamification/check-award | Check badges |
-| GET | /api/gamification/all-badges | All badges |
+### AI Integration
 
-### Analytics
-| Method | Endpoint | Description |
-|-------|---------|-------------|
-| GET | /api/analytics/dashboard/:studentId | Dashboard data |
+| Method | Endpoint | Auth | Purpose | Notes |
+|---|---|---:|---|---|
+| GET | `/ai/grades` | Yes | Returns the raw grades map used by the AI recommendation flow. | Only `approved` submissions are included. Response shape: `{ success, enoughData, data: { grades: { "CourseCode": GradeValue } } }`. |
 
-## 🔐 Authentication
+## Data Models
 
-All protected routes require a Bearer token:
+### Course
 
-```bash
-curl -H "Authorization: Bearer <token>" https://api.example.com/api/users/me
+| Field | Type | Notes |
+|---|---|---|
+| `courseCode` | String | Unique course identifier, e.g. `CS106A`. |
+| `title` | String | Human-readable course title. |
+| `level` | String | `Beginner`, `Intermediate`, or `Advanced`. |
+| `category` | String | `Core`, `Elective`, `Competitive Programming`, or `General`. |
+| `instructorName` | String | Display name used by the dashboard UI. |
+| `instructor` | ObjectId ref User | Instructor account reference. |
+| `sections` | Array of ObjectId refs Section | Section list for sidebar / course outline. |
+| `assignments` | Array | Placeholder assignments used by the UI to count course work. |
+| `stats` | Object | Includes `duration`, `hoursPerWeek`, `enrolledStudents`, and `term`. |
+
+### Section
+
+| Field | Type | Notes |
+|---|---|---|
+| `title` | String | Section title shown in the sidebar. |
+| `courseId` | ObjectId ref Course | Parent course. |
+| `order` | Number | Used for sequential unlocking. |
+
+### Progress
+
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | ObjectId ref User | Student owner of the progress record. |
+| `courseId` | ObjectId ref Course | Course tracked by the record. |
+| `completedSections` | Array of ObjectId refs Section | Completed sections. |
+| `items` | Array | Per-item state with `locked`, `available`, or `completed`. |
+| `percentage` | Number | Course progress percentage. |
+| `status` | String | `not_started`, `in_progress`, or `completed`. |
+| `weightedGrade` | Number | Weighted grade computed from category scores. |
+
+### Submission
+
+| Field | Type | Notes |
+|---|---|---|
+| `userId` | ObjectId ref User | Student submitting the work. |
+| `courseId` | ObjectId ref Course | Course that owns the assignment. |
+| `assignmentId` | ObjectId | Assignment identifier. |
+| `githubLink` | String | GitHub repository or submission link. |
+| `status` | String | `pending`, `approved`, or `needs_changes`. |
+| `grade` | Number | Reviewer-assigned grade. |
+
+## Dashboard Payload
+
+`GET /courses/my-dashboard` returns a response in this shape:
+
+```json
+{
+  "success": true,
+  "data": {
+  "stats": {
+  "coursesEnrolled": 3,
+  "overallProgress": 42
+  },
+  "courses": [
+  {
+  "_id": "...",
+  "title": "Programming Methodology",
+  "instructorName": "AbdallahRT",
+  "level": "Beginner",
+  "category": "Core",
+  "progressPercentage": 0,
+  "status": "not_started",
+  "assignmentsCount": 3,
+  "hasStarted": false
+  }
+  ]
+  }
+}
 ```
 
-## 🏢 Roles & Permissions
+### UI Behavior
 
-| Role | Permissions |
-|------|-------------|
-| Super Admin | All permissions |
-| Admin | All except manage_users |
-| Instructor | manage_courses, manage_assignments, manage_contests |
-| Student | view_analytics |
+- Use `hasStarted` to decide between **Start Learning** and **Continue Learning**.
+- Use `progressPercentage` to render the progress bar.
+- Use `status` to support course card state and filtering.
+- The backend returns all level-matching courses even if the student has not started them yet, so the frontend can show the full dashboard grid.
 
-## ⏰ Background Jobs
+## Course Details Sidebar Behavior
 
-Jobs run automatically when server starts:
+`GET /courses/:courseId` returns course details plus section states for the sidebar.
 
-| Job | Schedule | Description |
-|-----|----------|-------------|
-| ContestSyncJob | Every 6 hours | Sync contests |
-| ContestStatusUpdateJob | Every 5 min | Update status |
-| ReminderNotificationJob | Every 5 min | Send reminders |
-| CompetitiveProfileSyncJob | Daily | Sync profiles |
-| VerificationRevalidationJob | Daily | Re-verify accounts |
-| MaintenanceJob | Daily | Maintenance tasks |
+### Section Status
 
-Disable with `ENABLE_JOBS=false`
+| Status | UI Treatment |
+|---|---|
+| `locked` | Render lock icon `🔒` and disable access. |
+| `available` | Render as clickable / available. |
+| `completed` | Render checkmark `✅`. |
 
-## 🧪 Testing
+### Level Locking
 
-```bash
-# Health check
-curl http://localhost:3000/health
+- The backend enforces a prerequisite lock.
+- If a student tries to open an `Intermediate` course before finishing all `Beginner` courses, the API returns `403 Forbidden` with a descriptive message.
 
-# Register
-curl -X POST http://localhost:3000/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{"name":"Test","email":"test@gmail.com","password":"password123"}'
+## AI Grades Response
+
+`GET /ai/grades` returns only approved grades.
+
+```json
+{
+  "success": true,
+  "enoughData": true,
+  "data": {
+  "grades": {
+  "CS106A": 90,
+  "MATH18": 85
+  }
+  }
+}
 ```
 
-## 📝 Scripts
+### Notes
 
-```bash
-npm run st              # Start dev server
-npm run seed:roles      # Seed roles & admin
-npm run migrate:data   # Run data migration
-```
+- Only submissions with `status = approved` are included.
+- If there are no approved records yet, the backend returns `enoughData: false` with a clear message.
 
-## 🔧 Tech Stack
+## Error Codes
 
-- **Runtime:** Node.js 18+
-- **Framework:** Express.js
-- **Database:** MongoDB + Mongoose
-- **Auth:** JWT + Google OAuth
-- **Real-time:** Socket.IO
-- **Jobs:** node-cron
-- **Validation:** express-validator, Joi
+| HTTP Code | Meaning | Typical Scenario |
+|---|---|---|
+| `401 Unauthorized` | Missing or invalid token. | Authorization header is absent or token is invalid. |
+| `403 Forbidden` | Authenticated but not allowed. | Role restriction, ownership rule, or level lock. |
+| `404 Not Found` | Resource does not exist. | Invalid course, section, or submission ID. |
+| `409 Conflict` | Duplicate or conflicting record. | Submission uniqueness or similar constraint. |
+| `422 Unprocessable Entity` | Validation failed. | Bad payload shape or invalid field value. |
+| `500 Internal Server Error` | Unexpected server issue. | Unhandled backend failure. |
+| `502 Bad Gateway` | Upstream AI failure. | External AI server returned an error. |
+| `504 Gateway Timeout` | Upstream AI timeout. | AI server did not respond in time. |
 
-## 📄 License
+## Quick Testing Checklist
 
-Proprietary - All rights reserved
+1. Log in and copy the bearer token.
+2. Call `GET /courses/my-dashboard` and confirm the dashboard cards render with `hasStarted` and `progressPercentage`.
+3. Call `GET /courses/:courseId` and verify the sidebar can show `locked`, `available`, and `completed` sections.
