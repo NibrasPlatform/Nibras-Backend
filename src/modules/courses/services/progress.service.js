@@ -6,6 +6,65 @@ const Course = require("../models/course.model");
 const Section = require("../models/section.model");
 const Lesson = require("../models/lesson.model");
 const Submission = require("../models/submission.model");
+const ActivityEvent = require("../../gamification/models/activityEvent.model");
+const activityEventService = require("../../gamification/services/activityEvent.service");
+const STREAK_MILESTONES = new Set([7, 14, 30, 60]);
+
+const resolveDayKey = (value = new Date()) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+};
+
+const getStreakDaysEndingAt = (dayKeys, targetDayKey) => {
+  if (!targetDayKey || !dayKeys.has(targetDayKey)) return 0;
+
+  const targetDate = new Date(`${targetDayKey}T00:00:00.000Z`);
+  let streak = 0;
+  while (true) {
+    const current = new Date(targetDate);
+    current.setUTCDate(targetDate.getUTCDate() - streak);
+    const currentDayKey = current.toISOString().slice(0, 10);
+    if (!dayKeys.has(currentDayKey)) break;
+    streak += 1;
+  }
+  return streak;
+};
+
+const trackDailyLearningConsistency = async ({ userId, courseId, occurredAt = new Date() }) => {
+  const dayKey = resolveDayKey(occurredAt);
+  if (!dayKey) return;
+
+  await activityEventService.recordDailyLearningActivity({
+    userId,
+    courseId,
+    occurredAt,
+    dayKey,
+  });
+
+  const dailyEvents = await ActivityEvent.find({
+    userId,
+    eventType: "daily_learning_activity",
+  })
+    .select("metadata.dayKey occurredAt")
+    .lean();
+
+  const dayKeys = new Set(
+    dailyEvents
+      .map((event) => event?.metadata?.dayKey || resolveDayKey(event?.occurredAt))
+      .filter(Boolean)
+  );
+  const streakDays = getStreakDaysEndingAt(dayKeys, dayKey);
+  if (STREAK_MILESTONES.has(streakDays)) {
+    await activityEventService.recordLearningStreak({
+      userId,
+      courseId,
+      streakDays,
+      dayKey,
+      occurredAt,
+    });
+  }
+};
 
 const getProgress = async (userId, courseId) => {
   let progress = await Progress.findOne({ userId, courseId });
@@ -106,9 +165,12 @@ const updateSectionStatus = async (userId, courseId, sectionId, isCompleted, opt
   }
 
   const sectionIdStr = sectionId.toString();
+  const previousPercentage = Number(progress.percentage || 0);
+  const previousStatus = progress.status;
   const isAlreadyCompleted = progress.completedSections.some(
     (id) => id.toString() === sectionIdStr
   );
+  let lessonsInSection = [];
 
   // If marking completed, ensure previous section completed (sequential unlocking)
   const currentItemIndex = progress.items.findIndex((it) => it.itemId.toString() === sectionIdStr && it.itemType === "section");
@@ -122,8 +184,8 @@ const updateSectionStatus = async (userId, courseId, sectionId, isCompleted, opt
 
   if (isCompleted) {
     // If section has lessons, require client indicate watchedAll (best-effort enforcement)
-    const lessons = await Lesson.find({ sectionId });
-    if (lessons && lessons.length > 0) {
+    lessonsInSection = await Lesson.find({ sectionId }).select("_id").lean();
+    if (lessonsInSection.length > 0) {
       if (!options.watchedAll) {
         const error = new Error("All mandatory content for this section must be watched before marking completed.");
         error.statusCode = httpStatus.BAD_REQUEST;
@@ -190,6 +252,54 @@ const updateSectionStatus = async (userId, courseId, sectionId, isCompleted, opt
   await progress.populate("courseId", "title level");
   await progress.populate("completedSections");
 
+  const occurredAt = new Date();
+  if (isCompleted && !isAlreadyCompleted) {
+    await activityEventService.recordSectionCompleted({
+      userId,
+      courseId,
+      sectionId,
+      occurredAt,
+    });
+
+    if (lessonsInSection.length > 0) {
+      await Promise.all(
+        lessonsInSection.map((lesson) =>
+          activityEventService.recordLessonCompleted({
+            userId,
+            courseId,
+            sectionId,
+            lessonId: lesson._id,
+            occurredAt,
+          })
+        )
+      );
+    }
+  }
+
+  if (Number(progress.percentage || 0) !== previousPercentage) {
+    await activityEventService.recordCourseProgressBonus({
+      userId,
+      courseId,
+      previousProgress: previousPercentage,
+      newProgress: Number(progress.percentage || 0),
+      occurredAt,
+    });
+  }
+
+  if (previousStatus !== "completed" && progress.status === "completed") {
+    await activityEventService.recordCourseCompleted({
+      userId,
+      courseId,
+      occurredAt,
+    });
+  }
+
+  await trackDailyLearningConsistency({
+    userId,
+    courseId,
+    occurredAt,
+  });
+
   return progress;
 };
 
@@ -246,7 +356,7 @@ const getGlobalProgress = async (userId) => {
   };
 };
 
-const applyAssignmentApprovalBoost = async (userId, courseId) => {
+const applyAssignmentApprovalBoost = async (userId, courseId, options = {}) => {
   const course = await Course.findById(courseId).select("assignments");
   if (!course) {
     const error = new Error("Course not found");
@@ -266,6 +376,8 @@ const applyAssignmentApprovalBoost = async (userId, courseId) => {
   });
 
   const progress = await getProgress(userId, courseId);
+  const previousPercentage = Number(progress.percentage || 0);
+  const previousStatus = progress.status;
   const assignmentBoostTarget = Math.round((Math.min(approvedCount, totalAssignments) / totalAssignments) * 30);
 
   progress.percentage = Math.max(progress.percentage || 0, assignmentBoostTarget);
@@ -278,6 +390,32 @@ const applyAssignmentApprovalBoost = async (userId, courseId) => {
   }
 
   await progress.save();
+
+  const occurredAt = options.occurredAt || new Date();
+  if (Number(progress.percentage || 0) !== previousPercentage) {
+    await activityEventService.recordCourseProgressBonus({
+      userId,
+      courseId,
+      previousProgress: previousPercentage,
+      newProgress: Number(progress.percentage || 0),
+      occurredAt,
+    });
+  }
+
+  if (previousStatus !== "completed" && progress.status === "completed") {
+    await activityEventService.recordCourseCompleted({
+      userId,
+      courseId,
+      occurredAt,
+    });
+  }
+
+  await trackDailyLearningConsistency({
+    userId,
+    courseId,
+    occurredAt,
+  });
+
   return progress;
 };
 

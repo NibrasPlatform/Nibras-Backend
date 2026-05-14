@@ -8,7 +8,10 @@
     "start": "node src/server.js",
     "st": "nodemon src/server.js",
     "migrate:data": "node src/scripts/runDataMigration.js",
-    "seed:roles": "node src/scripts/seedRoles.js"
+    "seed:roles": "node src/scripts/seedRoles.js",
+    "backfill:course-events": "node src/scripts/backfillCourseActivityEvents.js",
+    "backfill:engagement-events": "node src/scripts/backfillEngagementEvents.js",
+    "backfill:reputation-snapshots": "node src/scripts/backfillReputationSnapshots.js"
   },
   "dependencies": {
     "axios": "^1.16.0",

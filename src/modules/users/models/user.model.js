@@ -51,6 +51,18 @@ const userSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    reputation: {
+      total: {
+        type: Number,
+        default: 0,
+      },
+      breakdown: {
+        problem: { type: Number, default: 0 },
+        community: { type: Number, default: 0 },
+        contest: { type: Number, default: 0 },
+        course: { type: Number, default: 0 },
+      },
+    },
     contestRating: {
       type: Number,
       default: 0,

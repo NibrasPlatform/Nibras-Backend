@@ -4,6 +4,8 @@ require("dotenv").config({ path: path.resolve(__dirname, "../../../.env") });
 const mongoose = require("mongoose");
 const connectDatabase = require("../core/config/database");
 const logger = require("../core/utils/logger");
+const Role = require("../modules/auth/models/role.model");
+require("../modules/community/models/tag.model");
 const User = require("../modules/users/models/user.model");
 const Question = require("../modules/community/models/question.model");
 const Answer = require("../modules/community/models/answer.model");
@@ -17,12 +19,37 @@ const Contest = require("../modules/contests/models/contest.model");
 const activityEventService = require("../modules/gamification/services/activityEvent.service");
 
 const getRoleName = (userMap, userId) => userMap.get(String(userId)) || "Student";
+const normalizeRoleFallback = (rawRole) => {
+  const value = String(rawRole || "").trim().toLowerCase();
+  if (!value) return "Student";
+  if (value === "ta") return "TA";
+  return value
+    .split(/\s+/)
+    .map((segment) => segment.charAt(0).toUpperCase() + segment.slice(1))
+    .join(" ");
+};
 
 const main = async () => {
   await connectDatabase();
 
-  const users = await User.find().populate("role").select("role").lean();
-  const userRoleMap = new Map(users.map((user) => [String(user._id), user.role?.name || "Student"]));
+  const users = await User.find().select("role").lean();
+  const roleIds = [
+    ...new Set(
+      users
+        .map((user) => user.role)
+        .filter((role) => mongoose.Types.ObjectId.isValid(String(role)))
+        .map((role) => String(role))
+    ),
+  ];
+  const roles = await Role.find({ _id: { $in: roleIds } }).select("name").lean();
+  const roleNameById = new Map(roles.map((role) => [String(role._id), role.name]));
+  const userRoleMap = new Map(
+    users.map((user) => {
+      const roleKey = String(user.role || "");
+      const roleName = roleNameById.get(roleKey) || normalizeRoleFallback(user.role);
+      return [String(user._id), roleName];
+    })
+  );
 
   const [questions, answers, threads, votes, progressRows, achievements, participations, contestsById] = await Promise.all([
     Question.find().populate("tags", "name").select("_id author course createdAt").lean(),

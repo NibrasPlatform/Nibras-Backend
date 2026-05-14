@@ -1,7 +1,7 @@
 const mongoose = require("mongoose");
 
 const roleEnum = ["Student", "Instructor", "TA", "Admin", "Super Admin"];
-const sourceEnum = ["problems", "contests", "community", "gamification", "manual"];
+const sourceEnum = ["problems", "contests", "community", "courses", "gamification", "manual"];
 const eventTypeEnum = [
   "problem_solved",
   "contest_joined",
@@ -15,6 +15,15 @@ const eventTypeEnum = [
   "answer_upvote_received",
   "thread_created",
   "badge_awarded",
+  "lesson_completed",
+  "section_completed",
+  "course_completed",
+  "assignment_submitted",
+  "assignment_approved",
+  "high_grade",
+  "daily_learning_activity",
+  "learning_streak",
+  "course_progress_bonus",
 ];
 
 const activityEventSchema = new mongoose.Schema(
@@ -70,6 +79,11 @@ const activityEventSchema = new mongoose.Schema(
       threadId: { type: mongoose.Schema.Types.ObjectId, ref: "Thread", default: null },
       achievementId: { type: mongoose.Schema.Types.ObjectId, ref: "Achievement", default: null },
       voteId: { type: mongoose.Schema.Types.ObjectId, ref: "Vote", default: null },
+      courseId: { type: mongoose.Schema.Types.ObjectId, ref: "Course", default: null },
+      sectionId: { type: mongoose.Schema.Types.ObjectId, ref: "Section", default: null },
+      lessonId: { type: mongoose.Schema.Types.ObjectId, ref: "Lesson", default: null },
+      assignmentId: { type: mongoose.Schema.Types.ObjectId, default: null },
+      submissionId: { type: mongoose.Schema.Types.ObjectId, ref: "Submission", default: null },
     },
     metadata: {
       difficulty: {
@@ -84,6 +98,30 @@ const activityEventSchema = new mongoose.Schema(
       percentileBucket: {
         type: String,
         enum: ["top_10", "top_25", null],
+        default: null,
+      },
+      grade: {
+        type: Number,
+        default: null,
+      },
+      progressPercentage: {
+        type: Number,
+        default: null,
+      },
+      previousProgress: {
+        type: Number,
+        default: null,
+      },
+      progressDelta: {
+        type: Number,
+        default: null,
+      },
+      streakDays: {
+        type: Number,
+        default: null,
+      },
+      dayKey: {
+        type: String,
         default: null,
       },
     },

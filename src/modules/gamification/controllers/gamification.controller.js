@@ -39,10 +39,21 @@ const getLeaderboardConfig = catchAsync(async (req, res) => {
   res.status(200).json({ success: true, message: "Leaderboard config fetched successfully", data });
 });
 
+const getMyReputation = catchAsync(async (req, res) => {
+  const userId = req.user?._id || req.user?.id;
+  const data = await gamificationService.getUserReputationBreakdown(userId);
+  res.status(200).json({
+    success: true,
+    message: "Reputation fetched successfully",
+    data,
+  });
+});
+
 module.exports = {
   checkAndAwardBadges,
   getAllBadges,
   getLeaderboard,
   getLeaderboardConfig,
   getMyLeaderboardRank,
+  getMyReputation,
 };

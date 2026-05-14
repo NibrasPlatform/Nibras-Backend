@@ -13,6 +13,15 @@ const breakdownFields = {
   answer_upvote_received: { type: Number, default: 0 },
   thread_created: { type: Number, default: 0 },
   badge_awarded: { type: Number, default: 0 },
+  lesson_completed: { type: Number, default: 0 },
+  section_completed: { type: Number, default: 0 },
+  course_completed: { type: Number, default: 0 },
+  assignment_submitted: { type: Number, default: 0 },
+  assignment_approved: { type: Number, default: 0 },
+  high_grade: { type: Number, default: 0 },
+  daily_learning_activity: { type: Number, default: 0 },
+  learning_streak: { type: Number, default: 0 },
+  course_progress_bonus: { type: Number, default: 0 },
 };
 
 const leaderboardEntrySchema = new mongoose.Schema(
@@ -68,6 +77,21 @@ const leaderboardEntrySchema = new mongoose.Schema(
     breakdown: {
       type: new mongoose.Schema(breakdownFields, { _id: false }),
       default: () => ({}),
+    },
+    reputation: {
+      total: { type: Number, default: 0 },
+      breakdown: {
+        type: new mongoose.Schema(
+          {
+            problem: { type: Number, default: 0 },
+            community: { type: Number, default: 0 },
+            contest: { type: Number, default: 0 },
+            course: { type: Number, default: 0 },
+          },
+          { _id: false }
+        ),
+        default: () => ({}),
+      },
     },
     generatedAt: {
       type: Date,

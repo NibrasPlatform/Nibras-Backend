@@ -3,11 +3,39 @@ const ActivityEvent = require("../models/activityEvent.model");
 const {
   COMMUNITY_EVENT_POINTS,
   CONTEST_EVENT_POINTS,
+  COURSE_EVENT_POINTS,
   getContestRatingGainPoints,
+  getCourseProgressBonusPoints,
+  getHighGradeBonusPoints,
   getProblemSolvedPoints,
 } = require("../utils/scoring.util");
 
+const COURSE_EVENT_TYPE_ALIAS = Object.freeze({
+  LESSON_COMPLETED: "lesson_completed",
+  SECTION_COMPLETED: "section_completed",
+  COURSE_COMPLETED: "course_completed",
+  ASSIGNMENT_SUBMITTED: "assignment_submitted",
+  ASSIGNMENT_APPROVED: "assignment_approved",
+  HIGH_GRADE: "high_grade",
+  DAILY_LEARNING_ACTIVITY: "daily_learning_activity",
+  LEARNING_STREAK: "learning_streak",
+  COURSE_PROGRESS_BONUS: "course_progress_bonus",
+});
+const STREAK_MILESTONES = new Set([7, 14, 30, 60]);
+
+const toDayKey = (value = new Date()) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toISOString().slice(0, 10);
+};
+
 class ActivityEventService {
+  normalizeCourseEventType(type) {
+    const normalized = String(type || "").trim();
+    if (!normalized) return null;
+    return COURSE_EVENT_TYPE_ALIAS[normalized] || COURSE_EVENT_TYPE_ALIAS[normalized.toUpperCase()] || normalized;
+  }
+
   async resolveRoleSnapshot(userId, explicitRole = null) {
     if (explicitRole) {
       return explicitRole;
@@ -25,7 +53,7 @@ class ActivityEventService {
     const roleSnapshot = await this.resolveRoleSnapshot(payload.userId, payload.roleSnapshot);
 
     try {
-      return await ActivityEvent.create({
+      const createdEvent = await ActivityEvent.create({
         userId: payload.userId,
         roleSnapshot,
         source: payload.source,
@@ -40,6 +68,12 @@ class ActivityEventService {
         metadata: payload.metadata || {},
         dedupeKey: payload.dedupeKey,
       });
+
+      if (!payload.skipReputationSync) {
+        const gamificationService = require("./gamification.service");
+        await gamificationService.syncUserReputationScore(payload.userId);
+      }
+      return createdEvent;
     } catch (error) {
       if (error?.code === 11000) {
         return null;
@@ -226,6 +260,306 @@ class ActivityEventService {
       refs: { achievementId },
       dedupeKey: `badge_awarded:${userId}:${achievementId}`,
     });
+  }
+
+  async recordLessonCompleted({ userId, courseId, sectionId, lessonId, occurredAt, roleSnapshot, skipReputationSync = false }) {
+    if (!userId || !courseId || !sectionId || !lessonId) return null;
+
+    return this.createEvent({
+      userId,
+      roleSnapshot,
+      source: "courses",
+      eventType: "lesson_completed",
+      points: COURSE_EVENT_POINTS.lesson_completed,
+      occurredAt: occurredAt || new Date(),
+      scope: { courseId },
+      refs: { courseId, sectionId, lessonId },
+      dedupeKey: `lesson_completed:${userId}:${lessonId}`,
+      skipReputationSync,
+    });
+  }
+
+  async recordSectionCompleted({ userId, courseId, sectionId, occurredAt, roleSnapshot, skipReputationSync = false }) {
+    if (!userId || !courseId || !sectionId) return null;
+
+    return this.createEvent({
+      userId,
+      roleSnapshot,
+      source: "courses",
+      eventType: "section_completed",
+      points: COURSE_EVENT_POINTS.section_completed,
+      occurredAt: occurredAt || new Date(),
+      scope: { courseId },
+      refs: { courseId, sectionId },
+      dedupeKey: `section_completed:${userId}:${sectionId}`,
+      skipReputationSync,
+    });
+  }
+
+  async recordCourseCompleted({ userId, courseId, occurredAt, roleSnapshot, skipReputationSync = false }) {
+    if (!userId || !courseId) return null;
+
+    return this.createEvent({
+      userId,
+      roleSnapshot,
+      source: "courses",
+      eventType: "course_completed",
+      points: COURSE_EVENT_POINTS.course_completed,
+      occurredAt: occurredAt || new Date(),
+      scope: { courseId },
+      refs: { courseId },
+      dedupeKey: `course_completed:${userId}:${courseId}`,
+      skipReputationSync,
+    });
+  }
+
+  async recordAssignmentSubmitted({
+    userId,
+    courseId,
+    assignmentId,
+    submissionId,
+    occurredAt,
+    roleSnapshot,
+    skipReputationSync = false,
+  }) {
+    if (!userId || !courseId || !submissionId) return null;
+
+    return this.createEvent({
+      userId,
+      roleSnapshot,
+      source: "courses",
+      eventType: "assignment_submitted",
+      points: COURSE_EVENT_POINTS.assignment_submitted,
+      occurredAt: occurredAt || new Date(),
+      scope: { courseId },
+      refs: {
+        courseId,
+        assignmentId: assignmentId || null,
+        submissionId: submissionId || null,
+      },
+      dedupeKey: `assignment_submitted:${userId}:${submissionId}`,
+      skipReputationSync,
+    });
+  }
+
+  async recordAssignmentApproved({
+    userId,
+    courseId,
+    assignmentId,
+    submissionId,
+    occurredAt,
+    roleSnapshot,
+    skipReputationSync = false,
+  }) {
+    if (!userId || !courseId || !submissionId) return null;
+
+    return this.createEvent({
+      userId,
+      roleSnapshot,
+      source: "courses",
+      eventType: "assignment_approved",
+      points: COURSE_EVENT_POINTS.assignment_approved,
+      occurredAt: occurredAt || new Date(),
+      scope: { courseId },
+      refs: {
+        courseId,
+        assignmentId: assignmentId || null,
+        submissionId: submissionId || null,
+      },
+      dedupeKey: `assignment_approved:${userId}:${submissionId}`,
+      skipReputationSync,
+    });
+  }
+
+  async recordHighGrade({
+    userId,
+    courseId,
+    assignmentId,
+    submissionId,
+    grade,
+    occurredAt,
+    roleSnapshot,
+    skipReputationSync = false,
+  }) {
+    const points = getHighGradeBonusPoints(grade);
+    if (!userId || !courseId || !submissionId || points <= 0) return null;
+
+    return this.createEvent({
+      userId,
+      roleSnapshot,
+      source: "courses",
+      eventType: "high_grade",
+      points,
+      occurredAt: occurredAt || new Date(),
+      scope: { courseId },
+      refs: {
+        courseId,
+        assignmentId: assignmentId || null,
+        submissionId: submissionId || null,
+      },
+      metadata: {
+        grade: Number(grade || 0),
+      },
+      dedupeKey: `high_grade:${userId}:${submissionId}`,
+      skipReputationSync,
+    });
+  }
+
+  async recordDailyLearningActivity({ userId, courseId, dayKey, occurredAt, roleSnapshot, skipReputationSync = false }) {
+    if (!userId || !courseId) return null;
+    const resolvedDayKey = dayKey || toDayKey(occurredAt || new Date());
+    if (!resolvedDayKey) return null;
+
+    return this.createEvent({
+      userId,
+      roleSnapshot,
+      source: "courses",
+      eventType: "daily_learning_activity",
+      points: COURSE_EVENT_POINTS.daily_learning_activity,
+      occurredAt: occurredAt || new Date(),
+      scope: { courseId },
+      refs: { courseId },
+      metadata: { dayKey: resolvedDayKey },
+      dedupeKey: `daily_learning:${userId}:${resolvedDayKey}`,
+      skipReputationSync,
+    });
+  }
+
+  async recordLearningStreak({
+    userId,
+    courseId,
+    streakDays,
+    dayKey,
+    occurredAt,
+    roleSnapshot,
+    skipReputationSync = false,
+  }) {
+    if (!userId || !courseId) return null;
+    const normalizedStreak = Number(streakDays || 0);
+    if (!STREAK_MILESTONES.has(normalizedStreak)) return null;
+    const resolvedDayKey = dayKey || toDayKey(occurredAt || new Date());
+    if (!resolvedDayKey) return null;
+
+    return this.createEvent({
+      userId,
+      roleSnapshot,
+      source: "courses",
+      eventType: "learning_streak",
+      points: COURSE_EVENT_POINTS.learning_streak,
+      occurredAt: occurredAt || new Date(),
+      scope: { courseId },
+      refs: { courseId },
+      metadata: {
+        streakDays: normalizedStreak,
+        dayKey: resolvedDayKey,
+      },
+      dedupeKey: `learning_streak:${userId}:${normalizedStreak}`,
+      skipReputationSync,
+    });
+  }
+
+  async recordCourseProgressBonus({
+    userId,
+    courseId,
+    previousProgress,
+    newProgress,
+    occurredAt,
+    roleSnapshot,
+    skipReputationSync = false,
+  }) {
+    const normalizedPrevious = Math.round(Number(previousProgress || 0) * 100) / 100;
+    const normalizedNew = Math.round(Number(newProgress || 0) * 100) / 100;
+    const progressDelta = Math.max(normalizedNew - normalizedPrevious, 0);
+    const points = getCourseProgressBonusPoints(normalizedNew, normalizedPrevious);
+    if (!userId || !courseId || points <= 0) return null;
+    return this.createEvent({
+      userId,
+      roleSnapshot,
+      source: "courses",
+      eventType: "course_progress_bonus",
+      points,
+      occurredAt: occurredAt || new Date(),
+      scope: { courseId },
+      refs: { courseId },
+      metadata: {
+        previousProgress: normalizedPrevious,
+        progressPercentage: normalizedNew,
+        progressDelta,
+      },
+      dedupeKey: `course_progress_bonus:${userId}:${courseId}:${normalizedPrevious}:${normalizedNew}`,
+      skipReputationSync,
+    });
+  }
+
+  async record(payload) {
+    const eventType = this.normalizeCourseEventType(payload?.type || payload?.eventType);
+    if (!payload?.userId || !eventType) return null;
+
+    const metadata = payload?.metadata || {};
+    const common = {
+      userId: payload.userId,
+      courseId: metadata.courseId || payload.courseId || null,
+      occurredAt: payload.occurredAt || new Date(),
+      roleSnapshot: payload.roleSnapshot || null,
+      skipReputationSync: Boolean(payload.skipReputationSync),
+    };
+
+    switch (eventType) {
+      case "lesson_completed":
+        return this.recordLessonCompleted({
+          ...common,
+          sectionId: metadata.sectionId,
+          lessonId: metadata.lessonId,
+        });
+      case "section_completed":
+        return this.recordSectionCompleted({
+          ...common,
+          sectionId: metadata.sectionId,
+        });
+      case "course_completed":
+        return this.recordCourseCompleted(common);
+      case "assignment_submitted":
+        return this.recordAssignmentSubmitted({
+          ...common,
+          assignmentId: metadata.assignmentId,
+          submissionId: metadata.submissionId || null,
+        });
+      case "assignment_approved":
+        return this.recordAssignmentApproved({
+          ...common,
+          assignmentId: metadata.assignmentId,
+          submissionId: metadata.submissionId || null,
+        });
+      case "high_grade":
+        return this.recordHighGrade({
+          ...common,
+          assignmentId: metadata.assignmentId,
+          submissionId: metadata.submissionId || null,
+          grade: metadata.grade,
+        });
+      case "daily_learning_activity":
+        return this.recordDailyLearningActivity({
+          ...common,
+          dayKey: metadata.dayKey || null,
+        });
+      case "learning_streak":
+        return this.recordLearningStreak({
+          ...common,
+          streakDays: metadata.streakDays,
+          dayKey: metadata.dayKey || null,
+        });
+      case "course_progress_bonus":
+        return this.recordCourseProgressBonus({
+          ...common,
+          previousProgress: metadata.previousProgress,
+          newProgress: metadata.newProgress || metadata.progressPercentage,
+        });
+      default:
+        return this.createEvent({
+          ...payload,
+          eventType,
+        });
+    }
   }
 }
 

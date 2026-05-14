@@ -23,6 +23,15 @@ const BREAKDOWN_FIELDS = [
   "answer_upvote_received",
   "thread_created",
   "badge_awarded",
+  "lesson_completed",
+  "section_completed",
+  "course_completed",
+  "assignment_submitted",
+  "assignment_approved",
+  "high_grade",
+  "daily_learning_activity",
+  "learning_streak",
+  "course_progress_bonus",
 ];
 
 const COURSE_ALLOWED_EVENT_TYPES = new Set([
@@ -32,6 +41,15 @@ const COURSE_ALLOWED_EVENT_TYPES = new Set([
   "question_upvote_received",
   "answer_upvote_received",
   "thread_created",
+  "lesson_completed",
+  "section_completed",
+  "course_completed",
+  "assignment_submitted",
+  "assignment_approved",
+  "high_grade",
+  "daily_learning_activity",
+  "learning_streak",
+  "course_progress_bonus",
 ]);
 
 const LEADERBOARD_SCORING_LEGEND = Object.freeze([
@@ -107,7 +125,99 @@ const LEADERBOARD_SCORING_LEGEND = Object.freeze([
     points: 15,
     note: "Counts in global boards only.",
   },
+  {
+    eventType: "lesson_completed",
+    label: "Lesson completed",
+    points: 2,
+    note: "Awarded once per lesson completion.",
+  },
+  {
+    eventType: "section_completed",
+    label: "Section completed",
+    points: 5,
+    note: "Awarded once per section completion.",
+  },
+  {
+    eventType: "course_completed",
+    label: "Course completed",
+    points: 100,
+    note: "Awarded once per completed course.",
+  },
+  {
+    eventType: "assignment_submitted",
+    label: "Assignment submitted",
+    points: 10,
+    note: "Awarded once per assignment submission.",
+  },
+  {
+    eventType: "assignment_approved",
+    label: "Assignment approved",
+    points: 20,
+    note: "Awarded once when an assignment is approved.",
+  },
+  {
+    eventType: "high_grade",
+    label: "High grade bonus",
+    points: 15,
+    note: "Awarded for assignment grade greater than 85.",
+  },
+  {
+    eventType: "daily_learning_activity",
+    label: "Daily learning activity",
+    points: 3,
+    note: "Awarded once per active learning day.",
+  },
+  {
+    eventType: "learning_streak",
+    label: "Learning streak",
+    points: 25,
+    note: "Awarded at each 7-day learning streak milestone.",
+  },
+  {
+    eventType: "course_progress_bonus",
+    label: "Course progress bonus",
+    points: "progressPercentage * 0.5",
+    note: "Awarded when course progress is recalculated.",
+  },
 ]);
+
+const REPUTATION_EVENT_TYPE_GROUPS = Object.freeze({
+  problem: new Set(["problem_solved"]),
+  community: new Set([
+    "question_created",
+    "answer_created",
+    "accepted_answer",
+    "question_upvote_received",
+    "answer_upvote_received",
+    "thread_created",
+    "badge_awarded",
+  ]),
+  contest: new Set([
+    "contest_joined",
+    "contest_top_25",
+    "contest_top_10",
+    "contest_rating_gain",
+  ]),
+  course: new Set([
+    "lesson_completed",
+    "section_completed",
+    "course_completed",
+    "assignment_submitted",
+    "assignment_approved",
+    "high_grade",
+    "daily_learning_activity",
+    "learning_streak",
+    "course_progress_bonus",
+  ]),
+});
+
+const getReputationBucketByEventType = (eventType) => {
+  if (REPUTATION_EVENT_TYPE_GROUPS.problem.has(eventType)) return "problem";
+  if (REPUTATION_EVENT_TYPE_GROUPS.community.has(eventType)) return "community";
+  if (REPUTATION_EVENT_TYPE_GROUPS.contest.has(eventType)) return "contest";
+  if (REPUTATION_EVENT_TYPE_GROUPS.course.has(eventType)) return "course";
+  return null;
+};
 
 class LeaderboardService {
   buildScopeMatch(scopeType, scopeId) {
@@ -203,6 +313,15 @@ class LeaderboardService {
             accumulator[field] = 0;
             return accumulator;
           }, {}),
+          reputation: {
+            total: 0,
+            breakdown: {
+              problem: 0,
+              community: 0,
+              contest: 0,
+              course: 0,
+            },
+          },
           voteCaps: {},
         });
       }
@@ -228,8 +347,13 @@ class LeaderboardService {
       }
 
       entry.score += pointsToAdd;
+      entry.reputation.total += pointsToAdd;
       if (Object.prototype.hasOwnProperty.call(entry.breakdown, event.eventType)) {
         entry.breakdown[event.eventType] += pointsToAdd;
+      }
+      const reputationBucket = getReputationBucketByEventType(event.eventType);
+      if (reputationBucket) {
+        entry.reputation.breakdown[reputationBucket] += pointsToAdd;
       }
     }
 
@@ -254,6 +378,7 @@ class LeaderboardService {
         scoreChange: entry.score - (previousScoreByUserId.get(String(entry.userId)) || 0),
         activeDays: entry.activeDays.size,
         breakdown: entry.breakdown,
+        reputation: entry.reputation,
         generatedAt: new Date(),
       }));
 
@@ -303,7 +428,7 @@ class LeaderboardService {
         .lean(),
       userId
         ? LeaderboardEntry.findOne({ ...query, userId })
-            .select("rank score scoreChange activeDays breakdown generatedAt")
+            .select("rank score scoreChange activeDays breakdown reputation generatedAt")
             .lean()
         : null,
       LeaderboardEntry.findOne(query)
@@ -322,6 +447,10 @@ class LeaderboardService {
       activeDays: currentUser?.activeDays || 0,
       percentile,
       breakdown: currentUser?.breakdown || {},
+      reputation: currentUser?.reputation || {
+        total: currentUser?.score || 0,
+        breakdown: { problem: 0, community: 0, contest: 0, course: 0 },
+      },
     };
 
     return {
@@ -362,6 +491,10 @@ class LeaderboardService {
         scoreChange: entry.scoreChange,
         activeDays: entry.activeDays,
         breakdown: entry.breakdown || {},
+        reputation: entry.reputation || {
+          total: entry.score || 0,
+          breakdown: { problem: 0, community: 0, contest: 0, course: 0 },
+        },
       })),
     };
   }
@@ -374,8 +507,8 @@ class LeaderboardService {
       scopeType: scope,
       scopeId: scope === "course" ? courseId : null,
       userId,
-    })
-      .select("rank score scoreChange activeDays breakdown")
+      })
+      .select("rank score scoreChange activeDays breakdown reputation")
       .lean();
 
     if (!entry && period !== "all-time") {
@@ -387,7 +520,7 @@ class LeaderboardService {
         scopeId: scope === "course" ? courseId : null,
         userId,
       })
-        .select("rank score scoreChange activeDays breakdown")
+        .select("rank score scoreChange activeDays breakdown reputation")
         .lean();
     }
 
@@ -404,6 +537,10 @@ class LeaderboardService {
       scoreChange: entry?.scoreChange || 0,
       activeDays: entry?.activeDays || 0,
       breakdown: entry?.breakdown || {},
+      reputation: entry?.reputation || {
+        total: entry?.score || 0,
+        breakdown: { problem: 0, community: 0, contest: 0, course: 0 },
+      },
     };
   }
 
@@ -422,7 +559,7 @@ class LeaderboardService {
       periods: ["weekly", "monthly", "all-time"],
       scopes: ["global", "course"],
       scoringLegend: LEADERBOARD_SCORING_LEGEND,
-      courseScopeNote: "Course leaderboards are based on course community activity only.",
+      courseScopeNote: "Course leaderboards include course learning and course-linked community activity.",
       courses: courses.map((course) => ({
         id: String(course._id),
         title: course.title,
