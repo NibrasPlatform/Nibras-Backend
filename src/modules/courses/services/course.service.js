@@ -99,6 +99,10 @@ const deleteCourse = async (courseId) => {
   return course;
 };
 
+const getCoursesByLevel = async (level) => {
+  const courses = await Course.find({ level }).populate("instructor", "name email").populate("sections");
+  return courses;
+}
 module.exports = {
   createCourse,
   createSection,
@@ -106,4 +110,5 @@ module.exports = {
   getCourseById,
   updateCourse,
   deleteCourse,
+  getCoursesByLevel
 };

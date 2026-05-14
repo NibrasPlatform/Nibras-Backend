@@ -95,6 +95,17 @@ const deleteCourse = catchAsync(async (req, res) => {
   });
 });
 
+const getCoursesByLevel = catchAsync(async (req, res) => {
+  const { level } = req.params;
+  const courses = await courseService.getCoursesByLevel(level);
+
+  res.status(httpStatus.OK).json({
+    success: true,
+    data: courses,
+  });
+});
+
+
 module.exports = {
   createCourse,
   createSection,
@@ -102,4 +113,5 @@ module.exports = {
   getCourseById,
   updateCourse,
   deleteCourse,
+  getCoursesByLevel
 };
