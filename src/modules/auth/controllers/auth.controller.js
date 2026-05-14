@@ -70,7 +70,21 @@ const refreshTokens = catchAsync(async (req, res) => {
     data: refreshResult.user,
   });
 });
+const forgotPassword = catchAsync(async (req, res) => {
+  await authService.forgotPassword(req.body.email);
+  res.status(httpStatus.OK).json({
+    success: true,
+    message: "OTP sent to your email for password reset.",
+  });
+});
 
+const resetPassword = catchAsync(async (req, res) => {
+  await authService.resetPassword(req.body);
+  res.status(httpStatus.OK).json({
+    success: true,
+    message: "Password has been reset successfully.",
+  });
+});
 module.exports = {
   registerManual,
   verifyOtp,
@@ -79,4 +93,6 @@ module.exports = {
   getMe,
   logout,
   refreshTokens,
+  forgotPassword,
+  resetPassword
 };

@@ -299,7 +299,46 @@ const refreshAuth = async (refreshToken) => {
   const tokens = await tokenService.generateAuthTokens(user);
   return { tokens, user: sanitizeUser(user) };
 };
+const forgotPassword = async (email) => {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+  
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    throw createServiceError("User with this email does not exist.", httpStatus.NOT_FOUND);
+  }
 
+  const otpCode = generateSixDigitOtp();
+  await Otp.findOneAndUpdate(
+    { email: normalizedEmail },
+    { email: normalizedEmail, otp: otpCode, createdAt: new Date() },
+    { upsert: true, setDefaultsOnInsert: true }
+  );
+
+  await sendOtpEmail(normalizedEmail, otpCode);
+  return { message: "OTP sent to your email." };
+};
+
+const resetPassword = async ({ email, otp, newPassword }) => {
+  const normalizedEmail = String(email || "").trim().toLowerCase();
+
+  const otpDoc = await Otp.findOne({ email: normalizedEmail, otp: String(otp).trim() });
+  if (!otpDoc) {
+    throw createServiceError("Invalid or expired OTP.", httpStatus.UNAUTHORIZED);
+  }
+
+  const user = await User.findOne({ email: normalizedEmail });
+  if (!user) {
+    throw createServiceError("User not found.", httpStatus.NOT_FOUND);
+  }
+
+  user.password = newPassword;
+  user.authProvider = "manual"; 
+  await user.save();
+
+  await Otp.deleteOne({ _id: otpDoc._id });
+
+  return { message: "Password reset successfully." };
+};
 module.exports = {
   registerManual,
   verifyOtp,
@@ -309,4 +348,6 @@ module.exports = {
   getStudentProfile,
   logout,
   refreshAuth,
+  forgotPassword,
+  resetPassword
 };

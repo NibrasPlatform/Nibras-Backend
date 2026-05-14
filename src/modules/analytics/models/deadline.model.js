@@ -20,4 +20,7 @@ const deadlineSchema = new mongoose.Schema({
     }
 }, { timestamps: true });
 
+// Index for student deadline lookups
+deadlineSchema.index({ studentId: 1 });
+
 module.exports = mongoose.models.Deadline || mongoose.model('Deadline', deadlineSchema);
