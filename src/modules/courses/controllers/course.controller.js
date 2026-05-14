@@ -19,10 +19,14 @@ const getMyDashboard = catchAsync(async (req, res) => {
   });
 
   const stats = {
-    coursesEnrolled: courses.filter(c => c.hasStarted).length,
-    overallProgress: courses.length > 0 
-      ? Math.round(courses.reduce((acc, curr) => acc + curr.progressPercentage, 0) / courses.length) 
-      : 0
+    coursesEnrolled: courses.filter((c) => c.hasStarted).length,
+    overallProgress:
+      courses.length > 0
+        ? Math.round(
+            courses.reduce((acc, curr) => acc + curr.progressPercentage, 0) /
+              courses.length
+          )
+        : 0,
   };
 
   res.status(httpStatus.OK).json({
@@ -48,12 +52,26 @@ const updateSelectedLevel = catchAsync(async (req, res) => {
   });
 });
 
+const createCourse = catchAsync(async (req, res) => {
+  const courseData = req.body;
+  courseData.instructor = req.user.id || req.user._id;
+  const course = await courseService.createCourse(courseData);
+  res.status(httpStatus.CREATED).json({ success: true, data: course });
+});
+
+const createSection = catchAsync(async (req, res) => {
+  const { courseId } = req.params;
+  const section = await courseService.createSection(courseId, req.body);
+  res.status(httpStatus.CREATED).json({ success: true, data: section });
+});
+
 /**
  * جلب كورس بالـ ID
  */
 const getCourseById = catchAsync(async (req, res) => {
   const { courseId } = req.params;
   const userId = req.user ? (req.user.id || req.user._id) : null;
+  
   const course = await courseService.getCourseById(courseId, userId);
   res.status(httpStatus.OK).json({ success: true, data: course });
 });
@@ -68,39 +86,28 @@ const getCourseByCode = catchAsync(async (req, res) => {
 });
 
 /**
+ * جلب كل الكورسات (للمسئولين)
+ */
+const getAllCourses = catchAsync(async (req, res) => {
+  const result = await courseService.getAllCourses(req.query);
+  res.status(httpStatus.OK).json({
+    success: true,
+    data: result.items,
+    meta: result.meta,
+  });
+});
+
+/**
  * جلب الكورسات بناءً على الليفل
  */
 const getCoursesByLevel = catchAsync(async (req, res) => {
   const { level } = req.params;
   const courses = await courseService.getCoursesByLevel(level);
-  res.status(httpStatus.OK).json({ success: true, data: courses });
-});
 
-/**
- * جلب كل الكورسات (Admin)
- */
-const getAllCourses = catchAsync(async (req, res) => {
-  const result = await courseService.getAllCourses(req.query);
-  res.status(httpStatus.OK).json({ success: true, data: result.items, meta: result.meta });
-});
-
-/**
- * إنشاء كورس
- */
-const createCourse = catchAsync(async (req, res) => {
-  const courseData = req.body;
-  courseData.instructor = req.user.id || req.user._id;
-  const course = await courseService.createCourse(courseData);
-  res.status(httpStatus.CREATED).json({ success: true, data: course });
-});
-
-/**
- * إنشاء سكشن
- */
-const createSection = catchAsync(async (req, res) => {
-  const { courseId } = req.params;
-  const section = await courseService.createSection(courseId, req.body);
-  res.status(httpStatus.CREATED).json({ success: true, data: section });
+  res.status(httpStatus.OK).json({
+    success: true,
+    data: courses,
+  });
 });
 
 /**

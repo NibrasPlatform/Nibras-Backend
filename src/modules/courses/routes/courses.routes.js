@@ -1,5 +1,8 @@
 const express = require("express");
 const courseController = require("../controllers/course.controller");
+const progressRoutes = require("./progress.routes");
+const submissionsRoutes = require("./submissions.routes");
+const gradeRoutes = require("../../ai/ai.routes"); // ملحوظة: السطر ده متعرف بس مش مستخدم تحت، مش هيضر بس لو مش محتاجه امسحه
 const { authenticate } = require("../../../core/middlewares/auth.middleware");
 const { authorize, authorizeRoles } = require("../../../core/middlewares/role.middleware");
 const validate = require("../../../core/middlewares/validation.middleware");
@@ -9,9 +12,11 @@ const {
   updateCourseSchema,
   createSectionSchema,
 } = require("../validation/course.validation");
-const progressRoutes = require("./progress.routes");
 
 const router = express.Router();
+
+router.use("/", progressRoutes);
+router.use("/submissions", submissionsRoutes);
 
 // --- مسارات التحكم (Admin/Instructor) ---
 router.post(
@@ -59,8 +64,5 @@ router.delete(
   authorize("manage_courses"),
   courseController.deleteCourse
 );
-
-// Mount progress routes
-router.use("/", progressRoutes);
 
 module.exports = router;

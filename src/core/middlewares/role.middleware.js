@@ -59,6 +59,7 @@ const roleMiddleware = (...legacyRoles) => {
     .flatMap((role) => {
       if (role === "admin") return ["Admin", "Super Admin"];
       if (role === "instructor") return ["Instructor"];
+      if (role === "ta") return ["TA"];
       if (role === "student") return ["Student"];
       return [];
     });

@@ -19,16 +19,38 @@ const userSchema = new mongoose.Schema(
     isVerified: { type: Boolean, default: false },
     authProvider: { type: String, enum: ["google", "manual"], required: true },
     role: { type: mongoose.Schema.Types.ObjectId, ref: "Role" },
-    reputationScore: { type: Number, default: 0 },
-    contestRating: { type: Number, default: 0 },
-    problemsSolved: { type: Number, default: 0 },
-    studyStreak: { type: Number, default: 0 },
-    // الحقل المسؤول عن فلترة الـ 32 كورس
+    
+    // 🎯 حقل ليفل الطالب (الأساسي لشغلنا في نبرأس)
     selectedLevel: {
       type: String,
       enum: ["Beginner", "Intermediate", "Advanced", "Expert"],
-      default: null, // بيكون null لحد ما يختار من صفحة الـ 4 مربعات
+      default: null,
     },
+
+    // 📚 الكورسات اللي الطالب مشترك فيها فعلياً
+    enrolledCourses: [
+      {
+        course: { type: mongoose.Schema.Types.ObjectId, ref: "Course", required: true },
+        enrolledAt: { type: Date, default: Date.now },
+      },
+    ],
+
+    // 🏆 نظام السمعة (Reputation) شامل التفاصيل
+    reputationScore: { type: Number, default: 0 },
+    reputation: {
+      total: { type: Number, default: 0 },
+      breakdown: {
+        problem: { type: Number, default: 0 },
+        community: { type: Number, default: 0 },
+        contest: { type: Number, default: 0 },
+        course: { type: Number, default: 0 },
+      },
+    },
+
+    // 📈 إحصائيات البرمجة التنافسية والالتزام
+    contestRating: { type: Number, default: 0 },
+    problemsSolved: { type: Number, default: 0 },
+    studyStreak: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

@@ -10,8 +10,8 @@ const chatbotAskValidator = [
     .withMessage('Question is required')
     .isLength({ min: 10 })
     .withMessage('Question must be at least 10 characters')
-    .isLength({ max: 500 })
-    .withMessage('Question cannot exceed 500 characters'),
+    .isLength({ max: 1000 })
+    .withMessage('Question cannot exceed 1000 characters'),
 ];
 
 /**

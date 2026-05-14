@@ -1,6 +1,8 @@
 const axios = require("axios");
 const BaseContestAdapter = require("./contests-baseAdapter");
 
+const CODEFORCES_BASE_URL = "https://codeforces.com";
+
 /**
  * Codeforces platform adapter
  * API Documentation: https://codeforces.com/apiHelp
@@ -81,14 +83,14 @@ class CodeforcesAdapter extends BaseContestAdapter {
       title: contest.name,
       platform: "codeforces",
       contestIdOnPlatform: contest.id.toString(),
-      url: `https://codeforces.com/contest/${contest.id}`,
-      joinUrl: `https://codeforces.com/contestRegistration/${contest.id}`,
+      url: `${CODEFORCES_BASE_URL}/contest/${contest.id}`,
+      joinUrl: `${CODEFORCES_BASE_URL}/contestRegistration/${contest.id}`,
       startTime: startTime,
-      duration: Math.floor(durationSeconds / 60), // Convert to minutes
+      duration: Math.floor(durationSeconds / 60),
       status: status,
-      numberOfProblems: contest.preparedBy ? 0 : 0, // Not available in API
-      registeredCount: 0, // Not available in list API
-      participantsCount: 0, // Not available in list API
+      numberOfProblems: 0,
+      registeredCount: 0,
+      participantsCount: 0,
       lastSyncedAt: new Date(),
     };
   }

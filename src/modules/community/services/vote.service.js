@@ -7,6 +7,7 @@ const Post = require("../models/post.model.js");
 const status = require("../../../core/constants/httpStatus");
 const AppError = require("../../../core/utils/errorHandler");
 const { emitVoteUpdated, emitVoteUpdatedForThread } = require("../../../realtime/events");
+const activityEventService = require("../../gamification/services/activityEvent.service");
 
 const getTargetModel = (targetType) => {
     if (targetType === "question") return Question;
@@ -128,6 +129,41 @@ const castVote = async ({ userId, targetType, targetId, value }) => {
                 } else {
                     emitVoteUpdatedForThread(roomContextId, votePayload);
                 }
+            }
+
+            if ((action === "created" || (action === "updated" && value === 1)) && value === 1 && (targetType === "question" || targetType === "answer")) {
+                let courseId = null;
+                let questionId = null;
+                let answerId = null;
+                let threadId = null;
+
+                if (targetType === "question") {
+                    questionId = target._id;
+                    const fullQuestion = await Question.findById(target._id).select("course");
+                    courseId = fullQuestion?.course || null;
+                } else if (targetType === "answer") {
+                    answerId = target._id;
+                    const fullQuestion = await Question.findById(target.question).select("course");
+                    questionId = target.question || null;
+                    courseId = fullQuestion?.course || null;
+                } else if (targetType === "thread") {
+                    threadId = target._id;
+                    const fullThread = await Thread.findById(target._id).select("course");
+                    courseId = fullThread?.course || null;
+                }
+
+                await activityEventService.recordVoteReward({
+                    userId: target.author,
+                    voteId: existing?._id || null,
+                    voterId: userId,
+                    targetType,
+                    targetId: target._id,
+                    questionId,
+                    answerId,
+                    threadId,
+                    courseId,
+                    occurredAt: new Date(),
+                });
             }
 
             return {
