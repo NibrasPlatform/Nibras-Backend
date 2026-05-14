@@ -20,6 +20,8 @@ const sectionSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// Compound index for course section queries sorted by order (course performance dashboard)
+sectionSchema.index({ courseId: 1, order: 1 });
 sectionSchema.index({ courseId: 1 });
 
 module.exports = mongoose.models.Section || mongoose.model("Section", sectionSchema);

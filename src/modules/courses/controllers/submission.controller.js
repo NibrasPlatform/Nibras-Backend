@@ -83,6 +83,7 @@ const updateSubmissionStatus = catchAsync(async (req, res) => {
   await submission.save();
 
   if (status === "approved") {
+    await progressService.applyAssignmentApprovalBoost(submission.userId, submission.courseId);
     await activityEventService.recordAssignmentApproved({
       userId: submission.userId,
       courseId: submission.courseId,

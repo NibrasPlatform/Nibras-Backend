@@ -165,6 +165,9 @@ const updateSectionStatus = async (userId, courseId, sectionId, isCompleted, opt
   }
 
   const sectionIdStr = sectionId.toString();
+  const isAlreadyCompleted = progress.completedSections.some(
+    (id) => id.toString() === sectionIdStr
+  );
   const previousPercentage = Number(progress.percentage || 0);
   const previousStatus = progress.status;
   const isAlreadyCompleted = progress.completedSections.some(
@@ -184,6 +187,8 @@ const updateSectionStatus = async (userId, courseId, sectionId, isCompleted, opt
 
   if (isCompleted) {
     // If section has lessons, require client indicate watchedAll (best-effort enforcement)
+    const lessons = await Lesson.find({ sectionId });
+    if (lessons && lessons.length > 0) {
     lessonsInSection = await Lesson.find({ sectionId }).select("_id").lean();
     if (lessonsInSection.length > 0) {
       if (!options.watchedAll) {
@@ -356,6 +361,7 @@ const getGlobalProgress = async (userId) => {
   };
 };
 
+const applyAssignmentApprovalBoost = async (userId, courseId) => {
 const applyAssignmentApprovalBoost = async (userId, courseId, options = {}) => {
   const course = await Course.findById(courseId).select("assignments");
   if (!course) {
