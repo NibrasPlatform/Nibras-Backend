@@ -1,5 +1,7 @@
 const express = require("express");
 const courseController = require("../controllers/course.controller");
+const progressRoutes = require("./progress.routes");
+const submissionsRoutes = require("./submissions.routes");
 const { authenticate } = require("../../../core/middlewares/auth.middleware");
 const { authorize, authorizeRoles } = require("../../../core/middlewares/role.middleware");
 const validate = require("../../../core/middlewares/validation.middleware");
@@ -11,6 +13,9 @@ const {
 } = require("../validation/course.validation");
 
 const router = express.Router();
+
+router.use("/", progressRoutes);
+router.use("/submissions", submissionsRoutes);
 
 router.post(
   "/",
