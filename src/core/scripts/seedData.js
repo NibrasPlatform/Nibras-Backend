@@ -8,21 +8,41 @@ const Lesson = require("../../modules/courses/models/lesson.model");
 const User = require("../../modules/users/models/user.model");
 
 const COURSES = [
-  { code: "CS106A", title: "Programming Methodology", category: "Core" },
-  { code: "CS106B", title: "Programming Abstractions", category: "Core" },
-  { code: "MATH101", title: "Calculus I", category: "Core" },
-  { code: "MATH102", title: "Calculus II", category: "Core" },
-  { code: "MATH103", title: "Calculus III", category: "Core" },
-  { code: "MATH201", title: "Linear Algebra", category: "Core" },
-  { code: "CS107", title: "Computer Organization", category: "Core" },
-  { code: "CS109", title: "Probability for Computer Scientists", category: "Core" },
-  { code: "CS161", title: "Design and Analysis of Algorithms", category: "Core" },
-  { code: "CS110", title: "Principles of Computer Systems", category: "Elective" },
-  { code: "CS124", title: "From Languages to Information", category: "Elective" },
-  { code: "CS142", title: "Web Applications", category: "Elective" },
-  { code: "CP201", title: "Competitive Programming Fundamentals", category: "Competitive Programming" },
-  { code: "CP202", title: "Advanced Problem Solving", category: "Competitive Programming" },
-  { code: "CS999", title: "Study Skills for CS", category: "General" },
+  // --- Beginner Courses (16) ---
+  { code: "CS103", title: "Mathematical Foundations of Computing", level: "Beginner" },
+  { code: "CS106A", title: "Programming Methodology", level: "Beginner" },
+  { code: "CS106B", title: "Programming Abstractions", level: "Beginner" },
+  { code: "CS106X", title: "Programming Abstractions (Accelerated)", level: "Beginner" },
+  { code: "CS109", title: "Probability for Computer Scientists", level: "Beginner" },
+  { code: "MATH18", title: "Foundations for Calculus", level: "Beginner" },
+  { code: "MATH19", title: "Calculus I", level: "Beginner" },
+  { code: "MATH20", title: "Calculus II", level: "Beginner" },
+  { code: "MATH21", title: "Calculus III", level: "Beginner" },
+  { code: "MATH51", title: "Linear Algebra & Multivariable Optimization", level: "Beginner" },
+  { code: "MATH52", title: "Integral Calculus of Several Variables", level: "Beginner" },
+  { code: "MATH53", title: "Ordinary Differential Equations", level: "Beginner" },
+  { code: "PHYS41", title: "Mechanics", level: "Beginner" },
+  { code: "PHYS43", title: "Electricity and Magnetism", level: "Beginner" },
+  { code: "BIO", title: "Introduction to Biology", level: "Beginner" },
+  { code: "CHEM", title: "General Chemistry", level: "Beginner" },
+
+  // --- Intermediate Courses (16) ---
+  { code: "CS107", title: "Computer Organization & Systems", level: "Intermediate" },
+  { code: "CS110", title: "Principles of Computer Systems", level: "Intermediate" },
+  { code: "CS157", title: "Computational Logic", level: "Intermediate" },
+  { code: "CS161", title: "Design and Analysis of Algorithms", level: "Intermediate" },
+  { code: "CS181", title: "Computers, Ethics, and Public Policy", level: "Intermediate" },
+  { code: "CS181W", title: "Computers, Ethics, and Public Policy (Writing)", level: "Intermediate" },
+  { code: "CS205L", title: "Continuous Mathematical Methods", level: "Intermediate" },
+  { code: "ENGR40M", title: "Introduction to Electronics", level: "Intermediate" },
+  { code: "ENGR76", title: "Information Science and Engineering", level: "Intermediate" },
+  { code: "MATH104", title: "Applied Linear Algebra", level: "Intermediate" },
+  { code: "MATH107", title: "Graph Theory", level: "Intermediate" },
+  { code: "MATH108", title: "Introduction to Combinatorics", level: "Intermediate" },
+  { code: "MATH109", title: "Applied Group Theory", level: "Intermediate" },
+  { code: "MATH110", title: "Applied Number Theory", level: "Intermediate" },
+  { code: "MATH113", title: "Linear Algebra and Matrix Theory", level: "Intermediate" },
+  { code: "PHIL251", title: "Philosophy of Mind", level: "Intermediate" }
 ];
 
 const SECTION_TITLES = [
@@ -49,31 +69,34 @@ const ensureInstructor = async () => {
     email: "abdallahrt@gmail.com",
     password: "TempPass123",
     authProvider: "manual",
+    role: "instructor",
     isVerified: true,
   });
 };
 
 const seedData = async () => {
-  if (!process.env.DATABASE_URL) {
+  const dbUrl = process.env.DATABASE_URL || process.env.MONGO_URI;
+  if (!dbUrl) {
     throw new Error("DATABASE_URL is required in .env");
   }
 
-  await mongoose.connect(process.env.DATABASE_URL);
+  await mongoose.connect(dbUrl);
   console.log("Connected to MongoDB");
 
   const instructor = await ensureInstructor();
 
-  // wipe old static course content
+  // Wipe old data
   await Lesson.deleteMany({});
   await Section.deleteMany({});
   await Course.deleteMany({});
 
   for (const base of COURSES) {
+    // 💡 الحل هنا: استخدمنا "Core" عشان نرضي الـ Validation بتاع المونجوس عندك
     const course = await Course.create({
       courseCode: base.code,
       title: base.title,
-      category: base.category,
-      level: "Beginner",
+      category: "Core", 
+      level: base.level,
       instructor: instructor._id,
       instructorName: "AbdallahRT",
       description: `${base.title} course content for Nibras students.`,
@@ -100,7 +123,7 @@ const seedData = async () => {
     await course.save();
   }
 
-  console.log("Seed completed: 15 courses with 4 sections each and 3 assignment placeholders.");
+  console.log(`✅ Success! Seeded ${COURSES.length} courses successfully.`);
   await mongoose.disconnect();
   console.log("Disconnected.");
 };

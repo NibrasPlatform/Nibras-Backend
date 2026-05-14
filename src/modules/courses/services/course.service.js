@@ -4,7 +4,6 @@ if (httpStatus.default) httpStatus = httpStatus.default;
 const Course = require("../models/course.model");
 const Section = require("../models/section.model");
 const Progress = require("../models/progress.model");
-require("../models/lesson.model");
 
 // دالة مساعدة لتجنب مشاكل الـ Regex في البحث
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -50,7 +49,7 @@ const createSection = async (courseId, sectionBody) => {
 };
 
 /**
- * جلب بيانات الـ Dashboard للطالب
+ * جلب بيانات الـ Dashboard للطالب (اللي بتفلتر الـ 32 كورس)
  */
 const getMyDashboard = async ({ userId, studentLevel, category } = {}) => {
   const filter = {};
@@ -91,6 +90,16 @@ const getMyDashboard = async ({ userId, studentLevel, category } = {}) => {
       hasStarted: hasProgress,
     };
   });
+};
+
+/**
+ * جلب الكورسات بناءً على الليفل (الدالة اللي كانت ناقصة)
+ */
+const getCoursesByLevel = async (level) => {
+  const safeLevel = escapeRegex(String(level).trim());
+  return Course.find({ level: { $regex: `^${safeLevel}$`, $options: "i" } })
+    .populate("instructor", "name")
+    .sort({ createdAt: -1 });
 };
 
 /**
@@ -135,7 +144,7 @@ const getCourseById = async (courseId, userId = null) => {
 };
 
 /**
- * التحقق من صلاحية الوصول لليفل (قفل الـ Intermediate)
+ * التحقق من صلاحية الوصول لليفل
  */
 const checkLevelAccess = async (userId, targetLevel) => {
   if (targetLevel.toLowerCase() === "beginner") return true;
@@ -190,6 +199,7 @@ module.exports = {
   createSection,
   getAllCourses,
   getMyDashboard,
+  getCoursesByLevel, 
   getCourseById,
   checkLevelAccess,
   getCourseByCode,

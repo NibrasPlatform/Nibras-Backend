@@ -13,6 +13,7 @@ const progressRoutes = require("./progress.routes");
 
 const router = express.Router();
 
+// --- مسارات التحكم (Admin/Instructor) ---
 router.post(
   "/",
   authenticate,
@@ -31,8 +32,13 @@ router.post(
   courseController.createSection
 );
 
+// --- مسارات الطالب والداشبورد ---
 router.get("/", authenticate, validate(listQuerySchema, "query"), courseController.getAllCourses);
+
+// التعديل هنا: الـ Dashboard والـ Level Update
 router.get("/my-dashboard", authenticate, courseController.getMyDashboard);
+router.patch("/update-level", authenticate, courseController.updateSelectedLevel);
+
 router.get('/level/:level', authenticate, courseController.getCoursesByLevel);
 router.get('/code/:code', authenticate, courseController.getCourseByCode);
 router.get("/:courseId", authenticate, courseController.getCourseById);

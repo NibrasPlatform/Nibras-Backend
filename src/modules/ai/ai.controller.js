@@ -1,22 +1,45 @@
+const axios = require("axios");
 const catchAsync = require("../../core/utils/catchAsync");
 const aiService = require("./ai.service"); 
 
 const getGrades = catchAsync(async (req, res) => {
   const userId = req.user.id || req.user._id;
   
-  // بينادي السيرفيس اللي بيلم الدرجات من الـ Submissions
-  const grades = await aiService.getGradesForAI(userId);
+  // 1. هنجيب الداتا (الخدمة دي بترجع Object جواه { grades: { ... } })
+  const payload = await aiService.getGradesForAI(userId);
 
-  const hasData = Object.keys(grades).length > 0;
+  // 2. التأكد إن فيه درجات حقيقية (أكبر من صفر)
+  const hasData = Object.values(payload.grades).some(grade => grade > 0);
 
-  res.status(200).json({
-    success: true,
-    enoughData: hasData,
-    data: {
-      grades: grades 
-    },
-    message: hasData ? "Student grades retrieved successfully" : "No approved grades found for this student."
-  });
+  if (!hasData) {
+    return res.status(400).json({
+      success: false,
+      message: "There are not enough grades for this student to generate a recommendation."
+    });
+  }
+
+  const railwayUrl = 'https://recommendationmodel-production-0f8e.up.railway.app/api/recommend';
+
+  try {
+    // 3. بنبعت الـ payload (اللي هو أصلاً جواه الـ Key اللي اسمه grades)
+    // لو عايز تتأكد 100% ابعتها كدة: { grades: payload.grades }
+    const response = await axios.post(railwayUrl, { grades: payload.grades });
+    
+    res.status(200).json({
+      success: true,
+      message: "AI recommendation generated successfully",
+      grades: payload.grades, // 👈 غيرناها هنا كمان لـ grades عشان تبقى زي اللي رايحة لعبدالله
+      data: response.data 
+    });
+
+  } catch (error) {
+    console.error("Error from Railway AI:", error.message);
+    res.status(500).json({
+      success: false,
+      message: "There was an error processing the AI recommendation. Please try again later.",
+      error: error.response ? error.response.data : error.message
+    });
+  }
 });
 
 module.exports = { getGrades };
