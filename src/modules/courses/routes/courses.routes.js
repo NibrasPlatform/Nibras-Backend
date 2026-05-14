@@ -18,7 +18,6 @@ const router = express.Router();
 
 router.use("/", progressRoutes);
 router.use("/submissions", submissionsRoutes);
-router.use("/grades", gradeRoutes);
 router.post(
   "/",
   authenticate,
@@ -42,7 +41,7 @@ router.get("/my-dashboard", authenticate, courseController.getMyDashboard);
 router.get('/level/:level', authenticate, courseController.getCoursesByLevel);
 router.get('/code/:code', authenticate, courseController.getCourseByCode);
 router.get("/:courseId", authenticate, courseController.getCourseById);
-router.get("/level/:level", authenticate, courseController.getCoursesByLevel);
+
 router.patch(
   "/:courseId",
   authenticate,
@@ -59,8 +58,5 @@ router.delete(
   authorize("manage_courses"),
   courseController.deleteCourse
 );
-
-// Mount progress routes
-router.use("/", progressRoutes);
 
 module.exports = router;
