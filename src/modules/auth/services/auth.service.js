@@ -1,4 +1,4 @@
-require("../models/permission.model"); // ده بيسجل الموديل في المونجوس بسconst Role = require("../../models/role.model");
+require("../models/permission.model"); // Registers the model with mongoose.
 let httpStatus = require("http-status");
 if (httpStatus.default) httpStatus = httpStatus.default;
 

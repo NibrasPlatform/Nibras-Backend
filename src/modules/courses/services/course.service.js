@@ -83,7 +83,8 @@ const getMyDashboard = async ({ userId, studentLevel, category } = {}) => {
 const getCoursesByLevel = async (level) => {
   const safeLevel = escapeRegex(String(level).trim());
   return Course.find({ level: { $regex: `^${safeLevel}$`, $options: "i" } })
-    .populate("instructor", "name")
+    .populate("instructor", "name email")
+    .populate("sections")
     .sort({ createdAt: -1 });
 };
 
@@ -211,12 +212,6 @@ const deleteCourse = async (courseId) => {
   return course;
 };
 
-const getCoursesByLevel = async (level) => {
-  return Course.find({ level: { $regex: `^${escapeRegex(String(level).trim())}$`, $options: "i" } })
-    .populate("instructor", "name email")
-    .populate("sections");
-};
-
 const getCourseByCode = async (courseCode) => {
   const safeCode = escapeRegex(String(courseCode || "").trim());
   return Course.findOne({ courseCode: { $regex: `^${safeCode}$`, $options: "i" } }).populate("sections");
@@ -227,11 +222,10 @@ module.exports = {
   createSection,
   getAllCourses,
   getMyDashboard,
-  getCoursesByLevel, 
+  getCoursesByLevel,
   getCourseById,
   checkLevelAccess,
   getCourseByCode,
   updateCourse,
   deleteCourse,
-  getCoursesByLevel
 };
