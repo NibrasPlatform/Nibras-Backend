@@ -34,9 +34,34 @@ const userSchema = new mongoose.Schema(
       type: mongoose.Schema.Types.ObjectId,
       ref: "Role",
     },
+    enrolledCourses: [
+      {
+        course: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "Course",
+          required: true,
+        },
+        enrolledAt: {
+          type: Date,
+          default: Date.now,
+        },
+      },
+    ],
     reputationScore: {
       type: Number,
       default: 0,
+    },
+    reputation: {
+      total: {
+        type: Number,
+        default: 0,
+      },
+      breakdown: {
+        problem: { type: Number, default: 0 },
+        community: { type: Number, default: 0 },
+        contest: { type: Number, default: 0 },
+        course: { type: Number, default: 0 },
+      },
     },
     contestRating: {
       type: Number,

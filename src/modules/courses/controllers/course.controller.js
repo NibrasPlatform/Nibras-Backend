@@ -16,6 +16,9 @@ const getMyDashboard = catchAsync(async (req, res) => {
     studentLevel,
     category: req.query.category,
   });
+const createCourse = catchAsync(async (req, res) => {
+  const courseData = req.body;
+  courseData.instructor = req.user._id;
 
   const stats = {
     coursesEnrolled: courses.filter(c => c.hasStarted).length,
@@ -85,6 +88,24 @@ const getCourseByCode = catchAsync(async (req, res) => {
  */
 const getAllCourses = catchAsync(async (req, res) => {
   const result = await courseService.getAllCourses(req.query);
+const updateCourse = catchAsync(async (req, res) => {
+  const { courseId } = req.params;
+  const course = await courseService.getCourseById(courseId);
+  const isAdmin = req.user.role.name === "Admin" || req.user.role.name === "Super Admin";
+  const courseInstructorId = course.instructor?._id
+    ? course.instructor._id.toString()
+    : course.instructor.toString();
+  const isOwner = req.user.role.name === "Instructor" && courseInstructorId === (req.user._id).toString();
+
+  if (!isAdmin && !isOwner) {
+    return res.status(httpStatus.FORBIDDEN).json({
+      success: false,
+      message: "Access Denied: You can only update your own courses.",
+    });
+  }
+
+  const updatedCourse = await courseService.updateCourse(courseId, req.body);
+
   res.status(httpStatus.OK).json({
     success: true,
     data: result.items,
@@ -104,6 +125,19 @@ const createSection = catchAsync(async (req, res) => {
   const section = await courseService.createSection(courseId, req.body);
   res.status(httpStatus.CREATED).json({ success: true, data: section });
 });
+  const course = await courseService.getCourseById(courseId);
+  const isAdmin = req.user.role.name === "Admin" || req.user.role.name === "Super Admin";
+  const courseInstructorId = course.instructor?._id
+    ? course.instructor._id.toString()
+    : course.instructor.toString();
+  const isOwner = req.user.role.name === "Instructor" && courseInstructorId === (req.user._id).toString();
+
+  if (!isAdmin && !isOwner) {
+    return res.status(httpStatus.FORBIDDEN).json({
+      success: false,
+      message: "Access Denied: You can only delete your own courses.",
+    });
+  }
 
 const updateCourse = catchAsync(async (req, res) => {
   const updated = await courseService.updateCourse(req.params.courseId, req.body);
@@ -116,6 +150,17 @@ const deleteCourse = catchAsync(async (req, res) => {
 });
 
 // تأكد إن كل الدوال دي مكتوبة هنا في الـ Exports
+const getCoursesByLevel = catchAsync(async (req, res) => {
+  const { level } = req.params;
+  const courses = await courseService.getCoursesByLevel(level);
+
+  res.status(httpStatus.OK).json({
+    success: true,
+    data: courses,
+  });
+});
+
+
 module.exports = {
   createCourse,
   createSection,
@@ -126,4 +171,6 @@ module.exports = {
   getCourseById,
   updateCourse,
   deleteCourse,
+};
+  getCoursesByLevel
 };

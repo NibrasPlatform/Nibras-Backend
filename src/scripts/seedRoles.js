@@ -19,6 +19,7 @@ const rolePermissionMap = {
     'Super Admin': ['manage_courses', 'manage_assignments', 'manage_contests', 'manage_users', 'view_analytics'],
     'Admin': ['manage_courses', 'manage_assignments', 'manage_contests', 'manage_users', 'view_analytics'],
     'Instructor': ['manage_courses', 'manage_assignments', 'manage_contests', 'view_analytics'],
+    'TA': ['view_analytics'],
     'Student': ['view_analytics']
 };
 

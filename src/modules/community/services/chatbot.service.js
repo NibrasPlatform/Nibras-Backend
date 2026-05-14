@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const axios = require('axios');
 const logger = require("../../../core/utils/logger");
 const User = require("../../users/models/user.model");
+const Role = require("../../auth/models/role.model");
 const Question = require('../models/question.model.js');
 const Answer = require('../models/answer.model.js');
 const Tag = require('../models/tag.model.js');
@@ -106,6 +107,11 @@ const processChatbotQuestion = async (question) => {
 const getOrCreateAIUser = async () => {
     const AI_EMAIL = 'ai-assistant@system.local';
 
+    const adminRole = await Role.findOne({ name: "Admin" });
+    if (!adminRole) {
+        throw new Error("Admin role not found. Please run seed:roles first.");
+    }
+
     const aiUser = await User.findOneAndUpdate(
         { email: AI_EMAIL },
         {
@@ -114,7 +120,7 @@ const getOrCreateAIUser = async () => {
                 email: AI_EMAIL,
                 password: crypto.randomBytes(32).toString('hex'),
                 isSystemUser: true,
-                role: 'admin',
+                role: adminRole._id,
             },
         },
         { upsert: true, returnDocument: "after" }

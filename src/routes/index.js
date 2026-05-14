@@ -10,7 +10,9 @@ const contestsRoutes = require("../modules/contests/routes");
 const problemsRoutes = require("../modules/problems/routes/problems.routes");
 const communityRoutes = require("../modules/community/routes/community.routes");
 const gamificationRoutes = require("../modules/gamification/routes/gamification.routes");
+const reputationRoutes = require("../modules/gamification/routes/reputation.routes");
 const analyticsRoutes = require("../modules/analytics/routes/analytics.routes");
+const mentorshipRoutes = require("../modules/mentorship/routes/mentorship.routes");
 
 const router = express.Router();
 
@@ -24,6 +26,8 @@ router.use("/contests", contestsRoutes);
 router.use("/problems", problemsRoutes);
 router.use("/community", communityRoutes);
 router.use("/gamification", gamificationRoutes);
+router.use("/reputation", reputationRoutes);
 router.use("/analytics", analyticsRoutes);
+router.use("/mentorship", mentorshipRoutes);
 
 module.exports = router;

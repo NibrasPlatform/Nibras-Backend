@@ -2,6 +2,12 @@ const Tag = require("../models/tag.model.js");
 const AppError = require("../../../core/utils/errorHandler");
 const status = require("../../../core/constants/httpStatus");
 
+const normalizePagination = (page, limit) => {
+  const p = Math.max(Number(page) || 1, 1);
+  const l = Math.min(Math.max(Number(limit) || 20, 1), 100);
+  return { page: p, limit: l, skip: (p - 1) * l };
+};
+
 const getTagIdByName = async (tagName) => {
     const tag = await Tag.findOne({ name: { $regex: new RegExp(`^${tagName}$`, 'i') } });
     if (!tag) {
@@ -17,27 +23,32 @@ const getTagByName = async (tagName) => {
 const getPopularTags = async (limit = 20) => {
     return await Tag.find()
         .sort({ usageCount: -1 })
-        .limit(limit);
+        .limit(limit)
+        .lean();
 };
 
-const getAllTags = async () => {
-    return await Tag.find()
-        .sort({ name: 1 });
+const getAllTags = async ({ page = 1, limit = 20 } = {}) => {
+    const { page: p, limit: l, skip } = normalizePagination(page, limit);
+    const [tags, total] = await Promise.all([
+        Tag.find().sort({ name: 1 }).skip(skip).limit(l).lean(),
+        Tag.countDocuments(),
+    ]);
+    return { tags, pagination: { page: p, limit: l, total, totalPages: Math.ceil(total / l) || 1 } };
 };
 
 const searchTags = async (query, limit = 10) => {
     if (!query || !query.trim()) {
         return getPopularTags(limit);
     }
-    
     const regex = new RegExp(query, 'i');
     return await Tag.find({ name: { $regex: regex } })
         .sort({ usageCount: -1 })
-        .limit(limit);
+        .limit(limit)
+        .lean();
 };
 
 const getTagById = async (id) => {
-    return await Tag.findById(id);
+    return await Tag.findById(id).lean();
 };
 
 const createTag = async (data) => {
@@ -61,10 +72,7 @@ const updateTag = async (id, data) => {
     }
 
     if (data.name) {
-        const existing = await Tag.findOne({
-            name: data.name,
-            _id: { $ne: id },
-        });
+        const existing = await Tag.findOne({ name: data.name, _id: { $ne: id } });
         if (existing) {
             throw AppError.create("Tag name already exists", 400, status.Fail);
         }
@@ -91,6 +99,7 @@ const incrementUsageCountByTagId = async (tagId, delta = 1) => {
     await Tag.findByIdAndUpdate(tagId, { $inc: { usageCount: delta } });
 };
 
+// Bulk increment/decrement — use this instead of per-tag loops
 const incrementUsageCount = async (tagIds, delta = 1) => {
     if (!tagIds || !Array.isArray(tagIds) || tagIds.length === 0) return;
     await Tag.updateMany({ _id: { $in: tagIds } }, { $inc: { usageCount: delta } });

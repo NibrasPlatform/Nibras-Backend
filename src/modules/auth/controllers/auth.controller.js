@@ -46,7 +46,7 @@ const login = catchAsync(async (req, res) => {
 });
 
 const getMe = catchAsync(async (req, res) => {
-  const user = await authService.getStudentProfile(req.user.id || req.user._id);
+  const user = await authService.getStudentProfile(req.user._id);
   res.status(httpStatus.OK).json({
     success: true,
     data: user,
@@ -54,7 +54,7 @@ const getMe = catchAsync(async (req, res) => {
 });
 
 const logout = catchAsync(async (req, res) => {
-  const result = await authService.logout(req.body.refreshToken, req.user.id || req.user._id);
+  const result = await authService.logout(req.body.refreshToken, req.user._id);
   res.status(httpStatus.OK).json({
     success: true,
     message: result.message,

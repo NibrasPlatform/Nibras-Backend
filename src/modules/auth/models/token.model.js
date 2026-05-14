@@ -30,4 +30,6 @@ const tokenSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+tokenSchema.index({ user: 1, type: 1 });
+
 module.exports = mongoose.models.Token || mongoose.model("Token", tokenSchema);

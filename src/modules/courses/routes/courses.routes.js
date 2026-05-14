@@ -1,5 +1,8 @@
 const express = require("express");
 const courseController = require("../controllers/course.controller");
+const progressRoutes = require("./progress.routes");
+const submissionsRoutes = require("./submissions.routes");
+const gradeRoutes = require("../../ai/ai.routes");
 const { authenticate } = require("../../../core/middlewares/auth.middleware");
 const { authorize, authorizeRoles } = require("../../../core/middlewares/role.middleware");
 const validate = require("../../../core/middlewares/validation.middleware");
@@ -13,6 +16,9 @@ const progressRoutes = require("./progress.routes");
 
 const router = express.Router();
 
+router.use("/", progressRoutes);
+router.use("/submissions", submissionsRoutes);
+router.use("/grades", gradeRoutes);
 router.post(
   "/",
   authenticate,
@@ -36,7 +42,7 @@ router.get("/my-dashboard", authenticate, courseController.getMyDashboard);
 router.get('/level/:level', authenticate, courseController.getCoursesByLevel);
 router.get('/code/:code', authenticate, courseController.getCourseByCode);
 router.get("/:courseId", authenticate, courseController.getCourseById);
-
+router.get("/level/:level", authenticate, courseController.getCoursesByLevel);
 router.patch(
   "/:courseId",
   authenticate,

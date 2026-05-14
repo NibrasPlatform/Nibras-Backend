@@ -18,14 +18,14 @@ router.get("/progress", problemController.getProgressByDifficulty);
 
 router.post(
   "/",
-  authorizeRoles("admin"),
+  authorizeRoles("Admin", "Super Admin"),
   valid(createProblemValidator),
   problemController.createProblem
 );
 
 router.patch(
   "/:id",
-  authorizeRoles("admin"),
+  authorizeRoles("Admin", "Super Admin"),
   valid(problemIdValidator),
   valid(updateProblemValidator),
   problemController.updateProblem
@@ -33,7 +33,7 @@ router.patch(
 
 router.delete(
   "/:id",
-  authorizeRoles("admin"),
+  authorizeRoles("Admin", "Super Admin"),
   valid(problemIdValidator),
   problemController.deleteProblem
 );

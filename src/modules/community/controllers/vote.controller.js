@@ -1,69 +1,37 @@
-const voteService = require("../services/vote.service.js");
+const catchAsync = require("../../../core/utils/catchAsync");
 const AppError = require("../../../core/utils/errorHandler");
-const status = require("../../../core/constants/httpStatus");
+const voteService = require("../services/vote.service.js");
 
-const castVote = async (req, res, next) => {
-  try {
-    if (!req.user || !req.user._id) {
-      return next(AppError.create("Unauthorized", 401, status.Fail));
-    }
-    
+const castVote = catchAsync(async (req, res) => {
     const targetType = String(req.body.targetType || "").toLowerCase().trim();
     const targetId = String(req.body.targetId || "").trim();
     const value = Number(req.body.value);
-     
+
     if (!targetType || !targetId || !Number.isFinite(value)) {
-      return next(
-        AppError.create(
-          "targetType, targetId, and value are required",
-          400,
-          status.Fail
-        )
-      );
+        throw AppError.create("targetType, targetId, and value are required", 400, "fail");
     }
 
     const result = await voteService.castVote({
-      userId: req.user._id,
-      targetType,
-      targetId,
-      value,
+        userId: req.user._id,
+        targetType,
+        targetId,
+        value,
     });
 
-    res.status(200).json({
-      message: "Vote processed successfully",
-      ...result,
-    });
-  } catch (err) {
-    const statusCode = err.statusCode || 500;
-    const statusText = statusCode >= 500 ? status.Error : status.Fail;
-    next(AppError.create(err.message, statusCode, statusText));
-  }
-};
+    res.status(200).json({ success: true, message: "Vote processed successfully", data: result });
+});
 
-const getMyVote = async (req, res, next) => {
-  try {
-    if (!req.user || !req.user._id) {
-      return next(AppError.create("Unauthorized", 401, status.Fail));
-    }
-
+const getMyVote = catchAsync(async (req, res) => {
     const targetType = String(req.params.targetType || "").toLowerCase().trim();
     const targetId = String(req.params.targetId || "").trim();
 
     const result = await voteService.getMyVote({
-      userId: req.user._id,
-      targetType,
-      targetId,
+        userId: req.user._id,
+        targetType,
+        targetId,
     });
 
-    res.status(200).json({
-      message: "Vote fetched successfully",
-      ...result,
-    });
-  } catch (err) {
-    const statusCode = err.statusCode || 500;
-    const statusText = statusCode >= 500 ? status.Error : status.Fail;
-    next(AppError.create(err.message, statusCode, statusText));
-  }
-};
+    res.status(200).json({ success: true, message: "Vote fetched successfully", data: result });
+});
 
 module.exports = { castVote, getMyVote };

@@ -1,13 +1,14 @@
 /**
  * {
-  title,
-  platform: "codeforces | leetcode | hackerrank",
-  contestIdOnPlatform,
-  url,
-  startTime,
-  duration,
-  status, // upcoming | running | finished
-    }
+   title,
+   platform: "codeforces | leetcode | hackerrank",
+   contestIdOnPlatform,
+   url,
+   joinUrl,
+   startTime,
+   duration,
+   status, // upcoming | running | finished
+   }
  */
 const mongoose = require("mongoose");
 
@@ -27,6 +28,9 @@ const contestSchema = new mongoose.Schema({
     url: {
         type: String,
         required: true,
+    },
+    joinUrl: {
+        type: String,
     },
     startTime: {
         type: Date,

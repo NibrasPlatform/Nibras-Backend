@@ -19,7 +19,7 @@ const projectSchema = new mongoose.Schema({
         default: 0
     },
     dueDate: {
-        type: String,
+        type: Date,
         required: true
     }
 }, { timestamps: true });
