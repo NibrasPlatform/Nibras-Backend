@@ -22,6 +22,9 @@ const askChatbot = catchAsync(async (req, res) => {
     logger.info("Chatbot response sent", {
         userId: req.user?._id,
         hintsCount: response.hints.length,
+        xai: response.xai,
+        tagsCount: response.tags.length,
+        communityQuestion: response.communityQuestion,
     });
 
     res.status(200).json({
@@ -33,6 +36,7 @@ const askChatbot = catchAsync(async (req, res) => {
             tags: response.tags,
             finalAnswer: response.finalAnswer,
             communityQuestion: response.communityQuestion,
+            xai: response.xai,
         },
     });
 });

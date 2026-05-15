@@ -36,7 +36,8 @@ const callAIService = async (question, retryCount = 0) => {
             question,
             hints: response.data.data.hints,
             finalAnswer: response.data.data.answer,
-            tags: response.data.data.tags
+            tags: response.data.data.tags,
+            xai: response.data.data.xai || null,
         };
         if(response.data.type === "community_match"){formattedResponse.communityQuestion = response.data.data.question_id;}
         
@@ -46,6 +47,7 @@ const callAIService = async (question, retryCount = 0) => {
             answer: formattedResponse.finalAnswer,
             tagsCount: formattedResponse.tags.length,
             communityQuestion: formattedResponse.communityQuestion,
+            xai: formattedResponse.xai,
         });
 
         return formattedResponse;
