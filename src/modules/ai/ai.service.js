@@ -2,7 +2,7 @@
 const Course = require("../courses/models/course.model");
 const Progress = require("../courses/models/progress.model");
 const Submission = require("../courses/models/submission.model");
-
+const answerService = require("../../modules/community/services/answer.service.js"); 
 // لستة المواد اللي هنجربها من غير مسافات
 const requiredCourses = [
   "CS107", "CS110", "CS161", "CS181", "CS181W", "ENGR40M", "ENGR76", 
@@ -39,10 +39,11 @@ const getGradesForAI = async (userId) => {
       }
     }
   });
-
+  const { answers } = await answerService.getAnswersForUser(userId, { page: 1, limit: 1 }); 
   // 4. نرجعها جوه key اسمه grades عشان تطابق الـ JSON المطلوب بالظبط
   return {
-    grades: gradesMap
+    grades: gradesMap,
+    answer:answers
   };
 };
 

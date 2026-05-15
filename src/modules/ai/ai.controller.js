@@ -18,17 +18,18 @@ const getGrades = catchAsync(async (req, res) => {
     });
   }
 
-  const railwayUrl = 'https://recommendationmodel-production-0f8e.up.railway.app/api/recommend';
+  const railwayUrl = process.env.Recommendation_SERVICE_URL;
 
   try {
     // 3. بنبعت الـ payload (اللي هو أصلاً جواه الـ Key اللي اسمه grades)
     // لو عايز تتأكد 100% ابعتها كدة: { grades: payload.grades }
-    const response = await axios.post(railwayUrl, { grades: payload.grades });
+    const response = await axios.post(railwayUrl, { grades: payload.grades , answer: payload.answer});
     
     res.status(200).json({
       success: true,
       message: "AI recommendation generated successfully",
       grades: payload.grades, // 👈 غيرناها هنا كمان لـ grades عشان تبقى زي اللي رايحة لعبدالله
+      answer: payload.answer,
       data: response.data 
     });
 
