@@ -30,6 +30,11 @@ const toDayKey = (value = new Date()) => {
 };
 
 class ActivityEventService {
+  isAdminRole(roleName) {
+    const normalizedRole = String(roleName || "").trim().toLowerCase();
+    return normalizedRole === "admin" || normalizedRole === "super admin";
+  }
+
   normalizeCourseEventType(type) {
     const normalized = String(type || "").trim();
     if (!normalized) return null;
@@ -51,6 +56,8 @@ class ActivityEventService {
     }
 
     const roleSnapshot = await this.resolveRoleSnapshot(payload.userId, payload.roleSnapshot);
+    const isAdmin = this.isAdminRole(roleSnapshot);
+    const points = isAdmin ? 0 : Number(payload.points || 0);
 
     try {
       const createdEvent = await ActivityEvent.create({
@@ -58,7 +65,7 @@ class ActivityEventService {
         roleSnapshot,
         source: payload.source,
         eventType: payload.eventType,
-        points: Number(payload.points || 0),
+        points,
         occurredAt: payload.occurredAt || new Date(),
         scope: {
           global: true,
@@ -69,7 +76,7 @@ class ActivityEventService {
         dedupeKey: payload.dedupeKey,
       });
 
-      if (!payload.skipReputationSync) {
+      if (!payload.skipReputationSync && !isAdmin) {
         const gamificationService = require("./gamification.service");
         await gamificationService.syncUserReputationScore(payload.userId);
       }
