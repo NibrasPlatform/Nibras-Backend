@@ -421,9 +421,8 @@ class LeaderboardService {
         .skip(skip)
         .limit(limitNumber)
         .populate({
-          path: "userId",
-          select: "name role",
-          populate: { path: "role", select: "name" },
+            path: "userId",
+            select: "name role",
         })
         .lean(),
       userId
@@ -485,7 +484,7 @@ class LeaderboardService {
         user: {
           id: String(entry.userId?._id || entry.userId),
           name: entry.userId?.name || "Unknown User",
-          role: entry.userId?.role?.name || "Student",
+          role: typeof entry.userId?.role === 'object' ? (entry.userId?.role?.name || "Student") : (entry.userId?.role || "Student"),
         },
         score: entry.score,
         scoreChange: entry.scoreChange,
