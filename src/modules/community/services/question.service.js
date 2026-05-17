@@ -3,7 +3,7 @@ const Tag = require("../models/tag.model.js");
 const tagService = require("./tag.service.js");
 const { emitQuestionCreated } = require("../../../realtime/events");
 const activityEventService = require("../../gamification/services/activityEvent.service");
-
+const answerService = require("./answer.service.js");
 const ALLOWED_CREATE_FIELDS = ["title", "body", "tags", "course", "author"];
 const ALLOWED_UPDATE_FIELDS = ["title", "body", "tags", "course"];
 
@@ -169,6 +169,10 @@ const deleteQuestion = async (id) => {
     const question = await Question.findById(id).lean();
     if (question && question.tags && question.tags.length > 0) {
         await Tag.updateMany({ _id: { $in: question.tags } }, { $inc: { usageCount: -1 } });
+    }
+    const answers = await answerService.getAnswersForQuestion(id);
+    for (const ans of answers.answers) {
+        await answerService.deleteAnswer(ans._id);
     }
     return await Question.findByIdAndDelete(id);
 };
