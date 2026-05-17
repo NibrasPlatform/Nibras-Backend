@@ -21,6 +21,7 @@ const safeBroadcast = (eventName, payload) => {
 const getQuestionRoomName = (questionId) => `question:${questionId}`;
 const getThreadRoomName = (threadId) => `thread:${threadId}`;
 const getCourseRoomName = (courseId) => `course:${courseId}`;
+const getUserRoomName = (userId) => String(userId);
 
 const registerRealtimeEvents = (io, socket) => {
   socket.on("question:join", (questionId) => {
@@ -36,6 +37,11 @@ const registerRealtimeEvents = (io, socket) => {
   socket.on("thread:join", (threadId) => {
     if (!threadId) return;
     socket.join(`thread:${threadId}`);
+  });
+
+  socket.on("user:join", (userId) => {
+    if (!userId) return;
+    socket.join(getUserRoomName(userId));
   });
 };
 
@@ -80,4 +86,5 @@ module.exports = {
   getQuestionRoomName,
   getThreadRoomName,
   getCourseRoomName,
+  getUserRoomName,
 };

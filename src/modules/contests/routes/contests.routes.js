@@ -13,11 +13,13 @@ const {
   syncContestsValidator,
 } = require("../validation/contest.validator");
 const valid = require("../../../core/middlewares/validation.middleware");
+const notificationController = require("../../notifications/controllers/notification.controller");
 
 router.get("/", valid(getContestsValidator), getContests);
 router.get("/:id", getContestById);
 
 router.use(authMiddleware.authenticate);
+router.post("/:contestId/remind", notificationController.scheduleContestReminder);
 
 router.post(
   "/sync",

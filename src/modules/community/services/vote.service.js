@@ -8,6 +8,7 @@ const status = require("../../../core/constants/httpStatus");
 const AppError = require("../../../core/utils/errorHandler");
 const { emitVoteUpdated, emitVoteUpdatedForThread } = require("../../../realtime/events");
 const activityEventService = require("../../gamification/services/activityEvent.service");
+const notificationService = require("../../notifications/services/notification.service");
 
 const getTargetModel = (targetType) => {
     if (targetType === "question") return Question;
@@ -163,6 +164,15 @@ const castVote = async ({ userId, targetType, targetId, value }) => {
                     threadId,
                     courseId,
                     occurredAt: new Date(),
+                });
+            }
+
+            if (value === 1 && (action === "created" || action === "updated")) {
+                await notificationService.notifyVote({
+                    targetType,
+                    targetId: target._id,
+                    recipientId: target.author,
+                    actorId: userId,
                 });
             }
 

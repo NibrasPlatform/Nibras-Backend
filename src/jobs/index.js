@@ -7,6 +7,7 @@ const verificationRevalidationJob = require("./verificationRevalidation.job");
 const maintenanceJob = require("./maintenance.job");
 const leaderboardRebuildJob = require("./leaderboardRebuild.job");
 const mentorSuggestionCacheWarmJob = require("./mentorSuggestionCacheWarm.job");
+const notificationReminderJob = require("./notificationReminder.job");
 
 const jobs = [
   contestSyncJob,
@@ -17,6 +18,7 @@ const jobs = [
   maintenanceJob,
   leaderboardRebuildJob,
   mentorSuggestionCacheWarmJob,
+  notificationReminderJob,
 ];
 
 let jobsStarted = false;

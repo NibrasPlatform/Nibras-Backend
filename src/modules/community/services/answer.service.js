@@ -4,6 +4,7 @@ const AppError = require("../../../core/utils/errorHandler");
 const status = require("../../../core/constants/httpStatus");
 const { emitAnswerCreated } = require("../../../realtime/events");
 const activityEventService = require("../../gamification/services/activityEvent.service");
+const notificationService = require("../../notifications/services/notification.service");
 
 const ALLOWED_CREATE_FIELDS = ["body", "author", "question", "isFromAI"];
 const ALLOWED_UPDATE_FIELDS = ["body"];
@@ -38,6 +39,12 @@ const createAnswer = async (data) => {
         courseId: question.course || null,
         occurredAt: populated.createdAt,
         roleSnapshot: populated.author?.role?.name || null,
+    });
+
+    await notificationService.notifyQuestionAnswered({
+        questionId: question._id,
+        answerId: populated._id,
+        actorId: populated.author?._id || populated.author,
     });
 
     return populated;

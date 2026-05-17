@@ -13,6 +13,7 @@ const gamificationRoutes = require("../modules/gamification/routes/gamification.
 const reputationRoutes = require("../modules/gamification/routes/reputation.routes");
 const analyticsRoutes = require("../modules/analytics/routes/analytics.routes");
 const mentorshipRoutes = require("../modules/mentorship/routes/mentorship.routes");
+const notificationRoutes = require("../modules/notifications/routes/notification.routes");
 
 const router = express.Router();
 
@@ -29,5 +30,6 @@ router.use("/gamification", gamificationRoutes);
 router.use("/reputation", reputationRoutes);
 router.use("/analytics", analyticsRoutes);
 router.use("/mentorship", mentorshipRoutes);
+router.use("/notifications", notificationRoutes);
 
 module.exports = router;
